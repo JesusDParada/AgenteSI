@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DARA - UIS | Agente de Selección de Aspirantes a Pregrado (PAR.01)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- HEADER INSTITUCIONAL UIS - DARA -->
+  <header class="bg-emerald-900 text-white shadow-md border-b border-emerald-700">
+    <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="bg-emerald-700 text-white font-black px-3 py-1.5 rounded-lg text-lg tracking-wider border border-emerald-500">
+          UIS · DARA
+        </div>
+        <div>
+          <h1 class="text-lg font-bold leading-tight">
+            Sistema Agéntico de Selección de Aspirantes a Pregrado (Procedimiento PAR.01)
+          </h1>
+          <p class="text-xs text-emerald-200">
+            Auditoría Documental Multimodal (PDF/Imagen) + Motor Determinista de Mérito + Copiloto Conversacional
+          </p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <span id="badge-ia" class="text-xs px-2.5 py-1 rounded-full bg-emerald-800 border border-emerald-600 text-emerald-100 font-medium">
+          Motor IA: Cargando...
+        </span>
+        <button onclick="ejecutarFlujoCompleto()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-semibold text-xs px-3.5 py-2 rounded-lg shadow transition">
+          ▶ Ejecutar Todo el Proceso PAR.01
+        </button>
+        <button onclick="abrirModalActa()" class="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-xs px-3.5 py-2 rounded-lg border border-emerald-500 transition">
+          📄 Informe Comité y Acta Consejo
+        </button>
+        <button onclick="reiniciarEscenario()" class="bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-xs px-3 py-2 rounded-lg border border-slate-600 transition">
+          ↺ Reiniciar Escenario Demo
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL: DASHBOARD + SIDEBAR COPILOTO -->
+  <main class="max-w-[1600px] w-full mx-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4">
+
+    <!-- COLUMNA IZQUIERDA (8/12): PIPELINE PAR.01, PROGRAMAS Y TABLA DE ASPIRANTES -->
+    <section class="lg:col-span-8 flex flex-col gap-4">
+
+      <!-- PIPELINE POR ETAPAS PAR.01 -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-600">
+            Pipeline Operativo del Procedimiento PAR.01 (Ejecución por Etapas)
+          </h2>
+          <span id="status-banner" class="text-xs text-emerald-700 font-medium">Listo para operar</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+          <button onclick="ejecutarEtapa('/api/proceso/auditar-soportes', 'Auditoría Multimodal IA de Soportes')"
+            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
+            <div class="text-[11px] font-bold text-emerald-700">ETAPA 1 · VISIÓN IA</div>
+            <div class="text-xs font-semibold text-slate-800 mt-0.5">Auditar Soportes PDF/PNG</div>
+            <div class="text-[11px] text-slate-500 mt-1">Saber 11°, Diploma y Voto</div>
+          </button>
+
+          <button onclick="ejecutarEtapa('/api/proceso/paso4-icfes', 'Paso 4: Cruce con Base Oficial ICFES')"
+            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
+            <div class="text-[11px] font-bold text-emerald-700">PASO 4 · CRUCE ICFES</div>
+            <div class="text-xs font-semibold text-slate-800 mt-0.5">Verificar SNP y Puntajes</div>
+            <div class="text-[11px] text-slate-500 mt-1">Detecta inconsistencias</div>
+          </button>
+
+          <button onclick="ejecutarEtapa('/api/proceso/paso5-requisitos', 'Paso 5: Puntajes Mínimos y Vigencia')"
+            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
+            <div class="text-[11px] font-bold text-emerald-700">PASO 5 · FILTRO MÍNIMO</div>
+            <div class="text-xs font-semibold text-slate-800 mt-0.5">Validar &ge; 31 pts y &le; 5 años</div>
+            <div class="text-[11px] text-slate-500 mt-1">Anula exámenes vencidos</div>
+          </button>
+
+          <button onclick="ejecutarEtapa('/api/proceso/pasos6-7-seleccion', 'Pasos 6 y 7: Selección, Desempates y P.F.U.')"
+            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
+            <div class="text-[11px] font-bold text-emerald-700">PASOS 6 Y 7 · MÉRITO</div>
+            <div class="text-xs font-semibold text-slate-800 mt-0.5">Ponderar + 5 Desempates</div>
+            <div class="text-[11px] text-slate-500 mt-1">Cruza P.F.U. y corre cupo</div>
+          </button>
+
+          <button onclick="ejecutarEtapa('/api/proceso/paso12-cartas', 'Paso 12: Códigos UIS, Hojas de Vida y Cartas')"
+            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
+            <div class="text-[11px] font-bold text-emerald-700">PASOS 8-12 · CIERRE</div>
+            <div class="text-xs font-semibold text-slate-800 mt-0.5">Expedir Códigos y Cartas</div>
+            <div class="text-[11px] text-slate-500 mt-1">Hoja de vida académica</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- TARJETAS DE MÉTRICAS Y PROGRAMAS OFERTADOS -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="text-xs text-slate-500">Total Inscritos</div>
+          <div id="metric-inscritos" class="text-2xl font-black text-slate-800">0</div>
+        </div>
+        <div class="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-sm">
+          <div class="text-xs text-emerald-700 font-medium">Admitidos (1ra y 2da Op.)</div>
+          <div id="metric-admitidos" class="text-2xl font-black text-emerald-700">0</div>
+        </div>
+        <div class="bg-white p-3.5 rounded-xl border border-amber-200 shadow-sm">
+          <div class="text-xs text-amber-700 font-medium">No Admitidos (Por Cupo)</div>
+          <div id="metric-no-admitidos" class="text-2xl font-black text-amber-600">0</div>
+        </div>
+        <div class="bg-white p-3.5 rounded-xl border border-rose-200 shadow-sm">
+          <div class="text-xs text-rose-700 font-medium">Anulados / Inhabilitados</div>
+          <div id="metric-anulados" class="text-2xl font-black text-rose-600">0</div>
+        </div>
+      </div>
+
+      <!-- PROGRAMAS ACADÉMICOS Y PONDERACIONES POR FACULTAD -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
+          Oferta Académica y Pesos Ponderados por Facultad (Sección 4 PAR.01)
+        </h3>
+        <div id="contenedor-programas" class="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-xs"></div>
+      </div>
+
+      <!-- TABLA INTERACTIVA DE ASPIRANTES -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex-1 flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 class="text-sm font-bold text-slate-800">
+              Registro de Aspirantes, Soportes Documentales y Trazabilidad de Decisiones
+            </h2>
+            <p class="text-xs text-slate-500">
+              Haz clic en «Expediente / Soportes» para auditar documentos PDF/PNG, subir nuevos archivos o ver cartas y notificaciones.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select id="filtro-programa" onchange="cargarAspirantes()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+              <option value="">Todos los Programas</option>
+            </select>
+            <select id="filtro-estado" onchange="cargarAspirantes()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+              <option value="">Todos los Estados</option>
+              <option value="ADMITIDO">ADMITIDO</option>
+              <option value="NO_ADMITIDO">NO_ADMITIDO</option>
+              <option value="INCONSISTENCIA_ICFES">INCONSISTENCIA_ICFES</option>
+              <option value="ANULADO_PUNTAJE_MINIMO">ANULADO_PUNTAJE_MINIMO</option>
+              <option value="ANULADO_VIGENCIA_EXAMEN">ANULADO_VIGENCIA_EXAMEN</option>
+              <option value="INHABILITADO_HISTORICO_UIS">INHABILITADO_HISTORICO_UIS</option>
+              <option value="INSCRITO">INSCRITO</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scroll">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase text-[11px]">
+                <th class="py-2.5 px-2">Turno</th>
+                <th class="py-2.5 px-2">Aspirante / Doc / SNP</th>
+                <th class="py-2.5 px-2">Opciones (1ra / 2da)</th>
+                <th class="py-2.5 px-2">Saber 11° (Año / Global / Áreas)</th>
+                <th class="py-2.5 px-2">Ponderado</th>
+                <th class="py-2.5 px-2">Soportes</th>
+                <th class="py-2.5 px-2">Estado y Causal PAR.01</th>
+                <th class="py-2.5 px-2 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-aspirantes" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLUMNA DERECHA (4/12): PANEL LATERAL DE CHAT COPILOTO DARA -->
+    <aside class="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[780px]">
+      <div class="p-4 border-b border-slate-200 bg-slate-900 text-white rounded-t-xl">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold flex items-center gap-2">
+            <span>🤖 Copiloto Conversacional DARA</span>
+          </h2>
+          <span class="text-[11px] bg-emerald-600 px-2 py-0.5 rounded font-semibold">Tool Calling Activo</span>
+        </div>
+        <p class="text-xs text-slate-300 mt-1">
+          Consulta causales de desempate, inhabilidades P.F.U., auditoría de soportes o solicita ejecutar etapas del procedimiento PAR.01.
+        </p>
+      </div>
+
+      <!-- SUGERENCIAS RÁPIDAS -->
+      <div class="p-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap gap-1.5">
+        <button onclick="enviarPreguntaRapida('Ejecuta el flujo completo de selección y asignación de cupos')"
+          class="text-[11px] bg-white hover:bg-emerald-50 text-slate-700 border border-slate-300 rounded-md px-2 py-1 transition">
+          ⚡ Ejecutar Selección
+        </button>
+        <button onclick="enviarPreguntaRapida('¿Por qué fue inhabilitado Sebastián Morales con documento 1098700002?')"
+          class="text-[11px] bg-white hover:bg-emerald-50 text-slate-700 border border-slate-300 rounded-md px-2 py-1 transition">
+          🔍 Caso P.F.U. (Sebastián)
+        </button>
+        <button onclick="enviarPreguntaRapida('¿Cómo se resolvió el empate de Valentina Rojas Pinzón?')"
+          class="text-[11px] bg-white hover:bg-emerald-50 text-slate-700 border border-slate-300 rounded-md px-2 py-1 transition">
+          🗳️ Desempate Voto (Valentina)
+        </button>
+        <button onclick="enviarPreguntaRapida('¿Por qué fue anulada Daniela Quintero o Jorge Mantilla?')"
+          class="text-[11px] bg-white hover:bg-emerald-50 text-slate-700 border border-slate-300 rounded-md px-2 py-1 transition">
+          ⚠️ Anulaciones Paso 5
+        </button>
+        <button onclick="enviarPreguntaRapida('Genera el informe y borrador de acta para el Comité de Admisiones y Consejo Académico')"
+          class="text-[11px] bg-white hover:bg-emerald-50 text-slate-700 border border-slate-300 rounded-md px-2 py-1 transition">
+          📋 Redactar Acta Comité
+        </button>
+      </div>
+
+      <!-- HISTORIAL DE MENSAJES -->
+      <div id="chat-mensajes" class="flex-1 p-4 overflow-y-auto custom-scroll space-y-3 text-xs">
+        <div class="bg-slate-100 border border-slate-200 rounded-lg p-3 text-slate-700">
+          <div class="font-bold text-emerald-800 mb-1">Copiloto DARA - UIS</div>
+          Bienvenido, Coordinador. Estoy conectado a la base de datos SQLite y a las herramientas deterministas del procedimiento <strong>PAR.01</strong>. ¿Qué etapa o aspirante deseas auditar hoy?
+        </div>
+      </div>
+
+      <!-- FORMULARIO DE ENTRADA DEL CHAT -->
+      <form onsubmit="enviarMensajeChat(event)" class="p-3 border-t border-slate-200 flex gap-2">
+        <input id="chat-input" type="text" placeholder="Pregunta por un aspirante, desempate o pide ejecutar una etapa..."
+          class="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-600" />
+        <button type="submit" class="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-xs px-4 py-2 rounded-lg transition">
+          Enviar
+        </button>
+      </form>
+    </aside>
+  </main>
+
+  <!-- MODAL DE EXPEDIENTE DEL ASPIRANTE, SOPORTES PDF/PNG Y CARTA DE ADMISIÓN -->
+  <div id="modal-expediente" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+        <h3 id="modal-exp-titulo" class="text-sm font-bold">Expediente del Aspirante</h3>
+        <button onclick="cerrarModalExpediente()" class="text-slate-300 hover:text-white text-lg font-bold">&times;</button>
+      </div>
+      <div id="modal-exp-contenido" class="p-5 overflow-y-auto custom-scroll space-y-4 text-xs"></div>
+    </div>
+  </div>
+
+  <!-- MODAL DE INFORME COMITÉ DE ADMISIONES Y ACTA CONSEJO ACADÉMICO -->
+  <div id="modal-acta" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="px-5 py-3.5 bg-emerald-900 text-white flex items-center justify-between">
+        <h3 class="text-sm font-bold">Informe Técnico Comité de Admisiones y Proyecto de Acta Consejo Académico (Pasos 8 y 9)</h3>
+        <button onclick="cerrarModalActa()" class="text-emerald-200 hover:text-white text-lg font-bold">&times;</button>
+      </div>
+      <div class="p-5 overflow-y-auto custom-scroll flex-1">
+        <pre id="modal-acta-texto" class="bg-slate-900 text-emerald-100 p-4 rounded-lg text-xs whitespace-pre-wrap font-mono leading-relaxed"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let programasCache = {};
+
+    function badgeEstado(estado) {
+      const estilos = {
+        ADMITIDO: "bg-emerald-100 text-emerald-800 border-emerald-300",
+        NO_ADMITIDO: "bg-amber-100 text-amber-800 border-amber-300",
+        INCONSISTENCIA_ICFES: "bg-rose-100 text-rose-800 border-rose-300",
+        ANULADO_PUNTAJE_MINIMO: "bg-rose-100 text-rose-800 border-rose-300",
+        ANULADO_VIGENCIA_EXAMEN: "bg-rose-100 text-rose-800 border-rose-300",
+        ANULADO_NIVEL_EDUCATIVO: "bg-rose-100 text-rose-800 border-rose-300",
+        INHABILITADO_HISTORICO_UIS: "bg-purple-100 text-purple-800 border-purple-300",
+        VERIFICADO_ICFES: "bg-sky-100 text-sky-800 border-sky-300",
+        HABILITADO: "bg-blue-100 text-blue-800 border-blue-300",
+        INSCRITO: "bg-slate-100 text-slate-700 border-slate-300"
+      };
+      const cls = estilos[estado] || estilos.INSCRITO;
+      return `<span class="inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold ${cls}">${estado}</span>`;
+    }
+
+    async function cargarTodo() {
+      await cargarStatusYProgramas();
+      await cargarAspirantes();
+    }
+
+    async function cargarStatusYProgramas() {
+      const [resStatus, resProg] = await Promise.all([
+        fetch("/api/status").then(r => r.json()),
+        fetch("/api/programas").then(r => r.json())
+      ]);
+
+      document.getElementById("badge-ia").textContent =
+        resStatus.gemini_configurado ? `Motor IA: ${resStatus.modelo_ia} (Online)` : "Motor IA: Respaldo Determinista Activo";
+
+      document.getElementById("metric-inscritos").textContent = resStatus.resumen.total_inscritos;
+      document.getElementById("metric-admitidos").textContent = resStatus.resumen.total_admitidos;
+      document.getElementById("metric-no-admitidos").textContent = resStatus.resumen.total_no_admitidos;
+      document.getElementById("metric-anulados").textContent = resStatus.resumen.total_inscripciones_anuladas;
+
+      const contProg = document.getElementById("contenedor-programas");
+      const selProg = document.getElementById("filtro-programa");
+      const valorActual = selProg.value;
+      selProg.innerHTML = `<option value="">Todos los Programas</option>`;
+      contProg.innerHTML = "";
+
+      resProg.forEach(p => {
+        programasCache[p.id] = p;
+        selProg.innerHTML += `<option value="${p.id}">${p.nombre} (${p.codigo})</option>`;
+        contProg.innerHTML += `
+          <div class="border border-slate-200 rounded-lg p-2.5 bg-slate-50/60">
+            <div class="flex items-center justify-between font-bold text-slate-800">
+              <span>${p.nombre}</span>
+              <span class="bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded text-[10px]">${p.cupos_ofertados} cupos</span>
+            </div>
+            <div class="text-[10px] text-slate-500 truncate mt-0.5">${p.facultad}</div>
+            <div class="text-[10px] text-slate-600 mt-1.5 font-mono">
+              CN:${p.peso_ciencias_naturales}% | SC:${p.peso_sociales_ciudadanas}% | MAT:${p.peso_matematicas}% | LC:${p.peso_lectura_critica}% | ING:${p.peso_ingles}%
+            </div>
+          </div>
+        `;
+      });
+      selProg.value = valorActual;
+    }
+
+    async function cargarAspirantes() {
+      const estado = document.getElementById("filtro-estado").value;
+      const progId = document.getElementById("filtro-programa").value;
+      const params = new URLSearchParams();
+      if (estado) params.append("estado", estado);
+      if (progId) params.append("programa_id", progId);
+
+      const aspirantes = await fetch(`/api/aspirantes?${params.toString()}`).then(r => r.json());
+      const tbody = document.getElementById("tabla-aspirantes");
+      tbody.innerHTML = "";
+
+      aspirantes.forEach(a => {
+        const p1 = programasCache[a.programa_opcion_1_id]?.nombre || `ID ${a.programa_opcion_1_id}`;
+        const p2 = a.programa_opcion_2_id ? (programasCache[a.programa_opcion_2_id]?.nombre || `ID ${a.programa_opcion_2_id}`) : "—";
+        const pond1 = a.puntaje_ponderado_op1 !== null ? a.puntaje_ponderado_op1.toFixed(2) : "—";
+        const pond2 = a.puntaje_ponderado_op2 !== null ? a.puntaje_ponderado_op2.toFixed(2) : "—";
+
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="py-2.5 px-2 font-mono font-bold text-slate-600">#${a.orden_inscripcion}</td>
+            <td class="py-2.5 px-2">
+              <div class="font-bold text-slate-800">${a.nombres} ${a.apellidos}</div>
+              <div class="text-[11px] text-slate-500">Doc: ${a.documento_identidad} · SNP: ${a.registro_snp}</div>
+              <div class="text-[10px] text-slate-400">SISBÉN ${a.grupo_sisben} (${a.tarifa_inscripcion_smlmv} SMLMV) ${a.certificado_electoral_valido ? '· 🗳️ Voto válido' : ''}</div>
+            </td>
+            <td class="py-2.5 px-2">
+              <div class="font-medium text-slate-700">1ra: ${p1}</div>
+              <div class="text-[11px] text-slate-500">2da: ${p2}</div>
+            </td>
+            <td class="py-2.5 px-2 font-mono text-[11px]">
+              <div><span class="font-bold text-slate-800">Año ${a.anio_examen}</span> · Global: <strong>${a.puntaje_global_declarado}</strong></div>
+              <div class="text-slate-500">CN:${a.ciencias_naturales_declarado} SC:${a.sociales_ciudadanas_declarado} MAT:${a.matematicas_declarado} LC:${a.lectura_critica_declarado} ING:${a.ingles_declarado}</div>
+            </td>
+            <td class="py-2.5 px-2 font-mono">
+              <div class="font-bold text-emerald-800">Op1: ${pond1}</div>
+              <div class="text-[11px] text-slate-500">Op2: ${pond2}</div>
+            </td>
+            <td class="py-2.5 px-2">
+              <span class="bg-slate-100 border border-slate-300 px-2 py-0.5 rounded text-[11px] font-medium">
+                ${a.soportes.length} archivo(s)
+              </span>
+            </td>
+            <td class="py-2.5 px-2 max-w-xs">
+              <div>${badgeEstado(a.estado_proceso)} ${a.codigo_estudiante_uis ? `<span class="ml-1 font-mono text-[10px] bg-emerald-800 text-white px-1.5 py-0.5 rounded">Cód: ${a.codigo_estudiante_uis}</span>` : ''}</div>
+              <div class="text-[11px] text-slate-600 mt-1 line-clamp-2">${a.causal_decision || ''}</div>
+            </td>
+            <td class="py-2.5 px-2 text-right">
+              <button onclick="verExpediente(${a.id})" class="bg-slate-800 hover:bg-emerald-700 text-white text-[11px] font-medium px-2.5 py-1.5 rounded-lg transition">
+                Expediente / Soportes
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    async function ejecutarEtapa(url, nombreEtapa) {
+      const banner = document.getElementById("status-banner");
+      banner.textContent = `Ejecutando ${nombreEtapa}...`;
+      await fetch(url, { method: "POST" });
+      await cargarTodo();
+      banner.textContent = `✓ ${nombreEtapa} completada`;
+    }
+
+    async function ejecutarFlujoCompleto() {
+      await ejecutarEtapa("/api/proceso/ejecutar-todo", "Flujo Completo PAR.01 (Etapas 1 a 12)");
+    }
+
+    async function reiniciarEscenario() {
+      await ejecutarEtapa("/api/seed", "Reinicio de Escenario Semilla DARA");
+    }
+
+    async function verExpediente(aspiranteId) {
+      const data = await fetch(`/api/aspirantes/${aspiranteId}`).then(r => r.json());
+      document.getElementById("modal-exp-titulo").textContent =
+        `Expediente DARA #${data.orden_inscripcion} — ${data.nombres} ${data.apellidos} (Doc: ${data.documento_identidad})`;
+
+      const soportesHtml = data.soportes.map(s => {
+        const urlArchivo = "/" + s.ruta_archivo.replace(/^\/+/, "");
+        return `
+          <div class="border border-slate-200 rounded-lg p-3 bg-slate-50 flex flex-col justify-between gap-2">
+            <div>
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-slate-800">${s.tipo_documento}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${s.es_valido ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                  ${s.es_valido ? 'VÁLIDO' : 'CON ALERTA'}
+                </span>
+              </div>
+              <div class="text-[11px] text-slate-500 mt-0.5">${s.nombre_archivo} (${s.mime_type})</div>
+              <div class="text-[11px] text-slate-700 mt-1">${s.observaciones_ia || 'Pendiente de auditoría multimodal'}</div>
+            </div>
+            <div class="flex items-center gap-2 pt-2 border-t border-slate-200">
+              <a href="${urlArchivo}" target="_blank" class="text-emerald-700 hover:underline font-semibold text-[11px]">
+                👁️ Abrir soporte original (${s.mime_type.includes('pdf') ? 'PDF' : 'PNG'})
+              </a>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      const logsHtml = (data.logs_parseados || []).map(l => `
+        <div class="border-l-2 border-emerald-600 pl-2.5 py-1">
+          <span class="font-mono text-[10px] text-slate-400">${l.timestamp}</span>
+          <span class="font-bold text-emerald-800 ml-1">[${l.etapa}]</span>
+          <div class="text-slate-700">${l.detalle}</div>
+        </div>
+      `).join("");
+
+      document.getElementById("modal-exp-contenido").innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
+          <div>
+            <div class="text-slate-400 text-[10px] uppercase font-bold">Estado del Proceso</div>
+            <div class="mt-1">${badgeEstado(data.estado_proceso)}</div>
+          </div>
+          <div>
+            <div class="text-slate-400 text-[10px] uppercase font-bold">Opciones Inscritas</div>
+            <div class="font-semibold text-slate-800 mt-0.5">1ra: ${data.programa_opcion_1_nombre}</div>
+            <div class="text-slate-600">2da: ${data.programa_opcion_2_nombre || 'Ninguna'}</div>
+          </div>
+          <div>
+            <div class="text-slate-400 text-[10px] uppercase font-bold">Código Estudiante UIS</div>
+            <div class="font-mono font-bold text-emerald-800 text-sm mt-0.5">${data.codigo_estudiante_uis || 'No asignado'}</div>
+          </div>
+        </div>
+
+        <div class="bg-amber-50/70 border border-amber-200 rounded-lg p-3">
+          <div class="font-bold text-amber-900">Causal Reglamentaria (PAR.01):</div>
+          <div class="text-slate-800 mt-0.5">${data.causal_decision || 'Sin decisión aún.'}</div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-bold text-slate-800 uppercase text-[11px]">Soportes Documentales (PDF e Imagen)</h4>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">${soportesHtml}</div>
+
+          <form onsubmit="subirSoporte(event, ${data.id})" class="mt-3 p-3 bg-slate-100 rounded-lg border border-slate-200 flex flex-wrap items-center gap-2">
+            <span class="font-bold text-slate-700">Adjuntar nuevo soporte PDF/Imagen:</span>
+            <select name="tipo_documento" class="border border-slate-300 rounded px-2 py-1 bg-white">
+              <option value="ICFES">Reporte Saber 11° (ICFES)</option>
+              <option value="DIPLOMA_BACHILLER">Diploma / Acta / Cert. 11°</option>
+              <option value="CERTIFICADO_ELECTORAL">Certificado Electoral</option>
+            </select>
+            <input type="file" name="archivo" accept=".pdf,.png,.jpg,.jpeg,.webp" required class="text-xs" />
+            <button type="submit" class="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold px-3 py-1 rounded">
+              Subir y Auditar con IA
+            </button>
+          </form>
+        </div>
+
+        ${data.notificacion_inconsistencia ? `
+          <div>
+            <h4 class="font-bold text-rose-800 uppercase text-[11px] mb-1">Notificación Oficial de Inconsistencia ICFES (Paso 4)</h4>
+            <pre class="bg-rose-950 text-rose-100 p-3 rounded-lg whitespace-pre-wrap font-mono text-[11px]">${data.notificacion_inconsistencia}</pre>
+          </div>
+        ` : ''}
+
+        ${data.carta_admision ? `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <h4 class="font-bold text-emerald-800 uppercase text-[11px] mb-1">Hoja de Vida Académica UIS (Paso 12)</h4>
+              <pre class="bg-slate-900 text-emerald-200 p-3 rounded-lg whitespace-pre-wrap font-mono text-[11px]">${data.hoja_vida_academica}</pre>
+            </div>
+            <div>
+              <h4 class="font-bold text-emerald-800 uppercase text-[11px] mb-1">Carta Oficial de Admisión (Paso 12)</h4>
+              <pre class="bg-slate-900 text-slate-100 p-3 rounded-lg whitespace-pre-wrap font-mono text-[11px]">${data.carta_admision}</pre>
+            </div>
+          </div>
+        ` : ''}
+
+        <div>
+          <h4 class="font-bold text-slate-700 uppercase text-[11px] mb-1.5">Bitácora de Trazabilidad y Auditoría</h4>
+          <div class="space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-200">${logsHtml}</div>
+        </div>
+      `;
+
+      const modal = document.getElementById("modal-expediente");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    async function subirSoporte(event, aspiranteId) {
+      event.preventDefault();
+      const form = event.target;
+      const formData = new FormData(form);
+      const r = await fetch(`/api/aspirantes/${aspiranteId}/soportes`, {
+        method: "POST",
+        body: formData
+      });
+      if (r.ok) {
+        await verExpediente(aspiranteId);
+        await cargarTodo();
+      }
+    }
+
+    function cerrarModalExpediente() {
+      const modal = document.getElementById("modal-expediente");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    async function abrirModalActa() {
+      const data = await fetch("/api/proceso/acta-comite").then(r => r.json());
+      document.getElementById("modal-acta-texto").textContent = data.informe_y_acta_texto;
+      const modal = document.getElementById("modal-acta");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function cerrarModalActa() {
+      const modal = document.getElementById("modal-acta");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    function enviarPreguntaRapida(texto) {
+      document.getElementById("chat-input").value = texto;
+      enviarMensajeChat(new Event("submit"));
+    }
+
+    async function enviarMensajeChat(event) {
+      if (event.preventDefault) event.preventDefault();
+      const input = document.getElementById("chat-input");
+      const mensaje = input.value.trim();
+      if (!mensaje) return;
+      input.value = "";
+
+      const cont = document.getElementById("chat-mensajes");
+      cont.innerHTML += `
+        <div class="bg-emerald-700 text-white rounded-lg p-3 ml-6">
+          <div class="font-bold text-[10px] text-emerald-200 mb-0.5">Coordinador DARA</div>
+          <div>${mensaje}</div>
+        </div>
+      `;
+      cont.scrollTop = cont.scrollHeight;
+
+      const res = await fetch("/api/copilot/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mensaje })
+      }).then(r => r.json());
+
+      const toolsBadges = (res.herramientas_invocadas || []).map(
+        t => `<span class="inline-block bg-emerald-900 text-emerald-100 font-mono text-[10px] px-1.5 py-0.5 rounded mr-1">🔧 ${t}()</span>`
+      ).join("");
+
+      cont.innerHTML += `
+        <div class="bg-slate-100 border border-slate-200 rounded-lg p-3 mr-4 text-slate-800">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-bold text-emerald-800">Copiloto DARA</span>
+            <span class="text-[10px] text-slate-400 font-mono">${res.modo_ia}</span>
+          </div>
+          ${toolsBadges ? `<div class="mb-2">${toolsBadges}</div>` : ''}
+          <div class="whitespace-pre-wrap leading-relaxed">${res.respuesta}</div>
+        </div>
+      `;
+      cont.scrollTop = cont.scrollHeight;
+      await cargarTodo();
+    }
+
+    window.addEventListener("DOMContentLoaded", cargarTodo);
+  </script>
+</body>
+</html>
