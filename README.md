@@ -1,12 +1,12 @@
 # Sistema Agéntico de Selección de Aspirantes a Pregrado UIS — DARA (Procedimiento PAR.01)
 
-Aplicación web híbrida (**Auditoría Documental Multimodal IA + Motor Determinista de Reglas + Copiloto Conversacional con Tool Calling**) desarrollada en **FastAPI + SQLite + Gemini 2.5 Flash (`google-genai`)** para automatizar y auditar con trazabilidad completa el procedimiento **PAR.01** de la Dirección de Admisiones y Registro Académico (DARA) de la Universidad Industrial de Santander (UIS).
+Aplicación web híbrida (**Auditoría Documental Multimodal IA + Motor Determinista de Reglas + Copiloto Conversacional con Tool Calling**) desarrollada en **FastAPI + SQLite + Gemini 3.5 Flash-Lite (`google-genai`)** para automatizar y auditar con trazabilidad completa el procedimiento **PAR.01** de la Dirección de Admisiones y Registro Académico (DARA) de la Universidad Industrial de Santander (UIS).
 
 ## Características Principales
 
 1. **Auditoría Documental Multimodal (PDF e Imagen)**:
    - Procesa soportes cargados en formato **PDF** e **imagen (`PNG`, `JPG`, `WEBP`)**: reporte individual del Examen de Estado Saber 11° (`ICFES`), acta/diploma de bachiller o certificado de grado 11° (`DIPLOMA_BACHILLER`) y certificado electoral (`CERTIFICADO_ELECTORAL`).
-   - Utiliza `gemini-2.5-flash` con esquemas estructurados Pydantic (`response_schema`) y cuenta con modo de respaldo determinista automático cuando no se define `GEMINI_API_KEY`.
+   - Utiliza `gemini-3.5-flash-lite` con esquemas estructurados Pydantic (`response_schema`) y cuenta con modo de respaldo determinista automático cuando no se define `GEMINI_API_KEY`.
 2. **Motor Determinista del Procedimiento PAR.01 (`app/services/rules_engine.py`)**:
    - **Sección 6 (Tarifas SISBÉN)**: Liquidación exacta en SMLMV según grupo SISBÉN (`A`, `B`, `C1-C10`, `OTROS`) para primera y segunda opción (máximo 2 programas).
    - **Paso 4 (Cruce Masivo ICFES)**: Confrontación de número de registro SNP y puntajes por área contra la fuente oficial simulada del ICFES (`MockIcfesOficial`) y generación automática del borrador de notificación de inconsistencia hacia `admisiones@uis.edu.co`.

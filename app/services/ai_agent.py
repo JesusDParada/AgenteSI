@@ -1,4 +1,4 @@
-"""Servicio de Auditoría Documental Multimodal IA (Gemini 2.5 Flash) y Copiloto DARA con Tool Calling."""
+"""Servicio de Auditoría Documental Multimodal IA (Gemini 3.5 Flash-Lite) y Copiloto DARA con Tool Calling."""
 
 import json
 import os
@@ -27,14 +27,29 @@ from app.services.rules_engine import (
     liquidar_derechos_inscripcion,
 )
 
-MODELO_GEMINI = "gemini-2.5-flash"
+MODELO_GEMINI = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 CORREO_INSTITUCIONAL_DARA = "admisiones@uis.edu.co"
 
 
-def tiene_gemini_api_key() -> bool:
-    """Verifica si existe una clave GEMINI_API_KEY configurada en el entorno."""
+def _obtener_gemini_api_key() -> str:
+    """Obtiene GEMINI_API_KEY desde variables de entorno o desde un archivo .env local."""
     key = os.getenv("GEMINI_API_KEY", "").strip()
-    return bool(key)
+    if key:
+        return key
+    env_path = Path(".env")
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line_clean = line.strip()
+            if line_clean.startswith("GEMINI_API_KEY="):
+                val = line_clean.split("=", 1)[1].strip().strip('"').strip("'")
+                if val:
+                    return val
+    return ""
+
+
+def tiene_gemini_api_key() -> bool:
+    """Verifica si existe una clave GEMINI_API_KEY configurada en el entorno o en .env."""
+    return bool(_obtener_gemini_api_key())
 
 
 # =====================================================================
@@ -46,8 +61,8 @@ def _extraer_con_gemini_vision(
     mime_type: str,
     tipo_documento: str,
 ) -> Optional[Any]:
-    """Invoca el modelo multimodal gemini-2.5-flash con response_schema Pydantic."""
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    """Invoca el modelo multimodal gemini-3.5-flash-lite con response_schema Pydantic."""
+    api_key = _obtener_gemini_api_key()
     if not api_key:
         return None
 
@@ -210,7 +225,7 @@ def auditar_soporte_multimodal(
     if ruta.exists() and ruta.is_file():
         file_bytes = ruta.read_bytes()
 
-    modo_ia = "gemini-2.5-flash"
+    modo_ia = MODELO_GEMINI
     resultado_schema = None
     if file_bytes and tiene_gemini_api_key():
         resultado_schema = _extraer_con_gemini_vision(
@@ -846,7 +861,7 @@ def procesar_mensaje_copiloto(
 ) -> Dict[str, Any]:
     """Procesa un mensaje del Coordinador de Admisiones usando Gemini Tool Calling o el orquestador determinista de respaldo."""
     herramientas_invocadas: List[str] = []
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    api_key = _obtener_gemini_api_key()
 
     if api_key:
         try:
