@@ -18,22 +18,30 @@ from app.schemas import (
     AspiranteOut,
     CopilotChatRequest,
     CopilotChatResponse,
+    GeminiConfigRequest,
     ProgramaAcademicoOut,
 )
 from app.services.ai_agent import (
     MODELO_GEMINI,
     auditar_soporte_multimodal,
     auditar_todos_los_soportes,
+    configurar_gemini_runtime,
     ejecutar_flujo_completo_par01,
     ejecutar_paso4_verificacion_icfes,
+    ejecutar_paso12_con_ia,
     generar_informe_y_acta_comite,
+    limpiar_telemetria_ia,
+    obtener_estado_pipeline_par01,
+    obtener_modelo_gemini_actual,
+    obtener_telemetria_ia,
+    probar_conexion_gemini,
     procesar_mensaje_copiloto,
+    registrar_evento_motor,
     tiene_gemini_api_key,
 )
 from app.services.rules_engine import (
     ANIO_CONVOCATORia_DEFAULT,
     ejecutar_paso5_validacion_puntajes_minimos,
-    ejecutar_paso12_hoja_vida_y_cartas_admision,
     ejecutar_pasos_6_y_7_seleccion_y_cruce_historico,
     generar_listados_oficiales,
     liquidar_derechos_inscripcion,
@@ -81,6 +89,8 @@ app = FastAPI(
 
 app.mount("/seed_docs", StaticFiles(directory=str(SEED_DOCS_DIR)), name="seed_docs")
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
+# Recursos de identidad visual institucional UIS (fuente Humanst521, logotipo).
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
@@ -99,22 +109,54 @@ def index_dashboard(request: Request):
 
 @app.get("/api/status")
 def api_status(db: Session = Depends(get_db)) -> Dict[str, Any]:
-    """Devuelve el estado general del sistema, configuración de IA y conteos actuales."""
+    """Devuelve el estado general del sistema, configuración de IA, telemetría en vivo y estado del pipeline."""
     listados = generar_listados_oficiales(db)
+    tiene_key = tiene_gemini_api_key()
     return {
         "status": "ok",
         "procedimiento": "PAR.01 - Selección de Aspirantes a Pregrado UIS",
-        "gemini_configurado": tiene_gemini_api_key(),
-        "modelo_ia": MODELO_GEMINI if tiene_gemini_api_key() else "deterministic_fallback",
+        "gemini_configurado": tiene_key,
+        "modelo_ia": obtener_modelo_gemini_actual() if tiene_key else "deterministic_fallback",
+        "telemetria_ia": obtener_telemetria_ia(),
+        "pipeline": obtener_estado_pipeline_par01(db),
         "total_programas": db.query(ProgramaAcademico).count(),
         "total_soportes": db.query(SoporteDocumental).count(),
         "resumen": listados["resumen"],
     }
 
 
+@app.get("/api/config/gemini")
+def obtener_config_gemini() -> Dict[str, Any]:
+    """Obtiene el estado detallado de configuración del modelo Gemini y su telemetría."""
+    return obtener_telemetria_ia()
+
+
+@app.post("/api/config/gemini")
+def actualizar_config_gemini(payload: GeminiConfigRequest) -> Dict[str, Any]:
+    """Configura la clave GEMINI_API_KEY y el modelo en vivo, guardándolos en .env y probando la conexión."""
+    telemetria = configurar_gemini_runtime(
+        api_key=payload.api_key,
+        modelo=payload.modelo,
+        persistir_env=payload.persistir_env,
+    )
+    prueba = probar_conexion_gemini() if telemetria["gemini_configurado"] else None
+    return {
+        "mensaje": "Configuración de Gemini actualizada.",
+        "telemetria": obtener_telemetria_ia(),
+        "prueba_conexion": prueba,
+    }
+
+
+@app.post("/api/config/gemini/probar")
+def endpoint_probar_gemini() -> Dict[str, Any]:
+    """Realiza una prueba de conexión en vivo contra Google Gemini API."""
+    return probar_conexion_gemini()
+
+
 @app.post("/api/seed")
 def reiniciar_escenario_semilla(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Reinicia la base de datos con el escenario de demostración y genera los soportes PDF/PNG semilla."""
+    limpiar_telemetria_ia()
     res = poblar_escenario_semilla(db)
     return {
         "mensaje": "Escenario semilla de demostración DARA cargado exitosamente.",
@@ -236,7 +278,15 @@ def endpoint_calcular_tarifa(
 ) -> Dict[str, Any]:
     """Liquida el valor en SMLMV de los derechos de inscripción según clasificación SISBÉN."""
     try:
-        return liquidar_derechos_inscripcion(grupo_sisben, num_opciones=num_opciones)
+        res = liquidar_derechos_inscripcion(grupo_sisben, num_opciones=num_opciones)
+        registrar_evento_motor(
+            etapa="SECCION_6_SISBEN",
+            proceso=f"Liquidación determinista tarifa SISBÉN ({grupo_sisben}, {num_opciones} opción/es)",
+            uso_llm=False,
+            modelo="rules_engine.py",
+            resumen=f"Tarifa liquidada: {res['total_smlmv']} SMLMV (Categoría {res['categoria_sisben']}).",
+        )
+        return res
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -283,7 +333,7 @@ async def cargar_soporte_aspirante(
     db.commit()
     db.refresh(sop)
 
-    resultado_auditoria = auditar_soporte_multimodal(db, sop.id)
+    resultado_auditoria = auditar_soporte_multimodal(db, sop.id, usar_llm_directo=True)
     return {
         "mensaje": "Soporte documental cargado y auditado exitosamente.",
         "auditoria": resultado_auditoria,
@@ -294,9 +344,9 @@ async def cargar_soporte_aspirante(
 def endpoint_auditar_soporte_individual(
     soporte_id: int, db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Ejecuta la auditoría multimodal IA sobre un soporte específico ya cargado."""
+    """Ejecuta la auditoría multimodal IA en vivo sobre un soporte específico ya cargado."""
     try:
-        return auditar_soporte_multimodal(db, soporte_id)
+        return auditar_soporte_multimodal(db, soporte_id, usar_llm_directo=True)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -320,16 +370,45 @@ def endpoint_paso5_requisitos(
     anio_convocatoria: int = ANIO_CONVOCATORia_DEFAULT,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Ejecuta el Paso 5 (PAR.01): Validación de puntaje mínimo >= 31 por área y vigencia <= 5 años."""
-    return ejecutar_paso5_validacion_puntajes_minimos(db, anio_convocatoria=anio_convocatoria)
+    """Ejecuta el Paso 5 (PAR.01): Validación de puntaje mínimo >= 31 por área y vigencia <= 5 años (100% Determinista)."""
+    res = ejecutar_paso5_validacion_puntajes_minimos(db, anio_convocatoria=anio_convocatoria)
+    registrar_evento_motor(
+        etapa="PASO_5_FILTRO_MINIMO",
+        proceso="Validación determinista de puntaje >= 31 por área y vigencia <= 5 años (>= 2012)",
+        uso_llm=False,
+        modelo="rules_engine.py",
+        resumen=(
+            f"Habilitados={res['habilitados']}, Anulados <31={res['anulados_puntaje_minimo']}, "
+            f"Anulados vigencia={res['anulados_vigencia_examen']}."
+        ),
+    )
+    res["uso_llm"] = False
+    res["modelo_ia"] = "rules_engine.py"
+    res["tipo_motor"] = "DETERMINISTA_PURO"
+    return res
 
 
 @app.post("/api/proceso/pasos6-7-seleccion")
 def endpoint_pasos6_y_7_seleccion(
     programa_id: Optional[int] = None, db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Ejecuta los Pasos 6 y 7 (PAR.01): Ponderación, 5 reglas de desempate, 1ra/2da opción y cruce P.F.U."""
-    return ejecutar_pasos_6_y_7_seleccion_y_cruce_historico(db, programa_id=programa_id)
+    """Ejecuta los Pasos 6 y 7 (PAR.01): Ponderación, 5 reglas de desempate, 1ra/2da opción y cruce P.F.U. (100% Determinista)."""
+    res = ejecutar_pasos_6_y_7_seleccion_y_cruce_historico(db, programa_id=programa_id)
+    registrar_evento_motor(
+        etapa="PASOS_6_7_MERITO_PFU",
+        proceso="Ponderación por Facultad, 5 desempates en cascada y cruce de inhabilidades P.F.U.",
+        uso_llm=False,
+        modelo="rules_engine.py",
+        resumen=(
+            f"Admitidos={res['total_admitidos']} (1ra Op={res['admitidos_primera_opcion']}, "
+            f"2da Op={res['admitidos_segunda_opcion']}), P.F.U.={res['inhabilitados_historico_uis']}, "
+            f"No admitidos={res['no_admitidos']}."
+        ),
+    )
+    res["uso_llm"] = False
+    res["modelo_ia"] = "rules_engine.py"
+    res["tipo_motor"] = "DETERMINISTA_PURO"
+    return res
 
 
 @app.get("/api/proceso/listados")
@@ -352,8 +431,8 @@ def endpoint_acta_comite(
 def endpoint_paso12_cartas(
     periodo_academico: str = "2026-2", db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
-    """Ejecuta el Paso 12 (PAR.01): Asigna código de estudiante UIS, hoja de vida y carta de admisión."""
-    return ejecutar_paso12_hoja_vida_y_cartas_admision(db, periodo_academico=periodo_academico)
+    """Ejecuta el Paso 12 (PAR.01): Asigna código de estudiante UIS, hoja de vida y carta de admisión con apoyo IA."""
+    return ejecutar_paso12_con_ia(db, periodo_academico=periodo_academico)
 
 
 @app.post("/api/proceso/ejecutar-todo")

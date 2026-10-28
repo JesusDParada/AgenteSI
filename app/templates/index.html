@@ -4,147 +4,393 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DARA - UIS | Agente de Selección de Aspirantes a Pregrado (PAR.01)</title>
+  <link rel="icon" type="image/png" href="/static/img/logo-uis-simbolo.png" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    /*
+     * Identidad visual institucional UIS (Manual de marca - DiseñoUis):
+     *  - Color institucional: PANTONE 368 · CMYK C50 Y95 · RGB 103,185,62 (#67B93E).
+     *  - Tipografía institucional: Humanst521 BT.
+     * Se remapean las paletas de Tailwind usadas por la interfaz (incluidas las clases
+     * generadas dinámicamente desde JavaScript) para que hereden la identidad UIS
+     * sin modificar la lógica de la aplicación.
+     */
+    const UIS_VERDE = {
+      50:  "#f2f9ee",
+      100: "#e1f1d7",
+      200: "#c5e4b1",
+      300: "#a3d383",
+      400: "#84c55c",
+      500: "#67b93e",  // PANTONE 368 · RGB 103,185,62
+      600: "#539c2f",
+      700: "#437d27",
+      800: "#386323",
+      900: "#2f5220",
+      950: "#172d0e"
+    };
+    const UIS_GRIS = {
+      50:  "#f7f7f6",
+      100: "#efefed",
+      200: "#e2e2df",
+      300: "#cdcdc9",
+      400: "#a3a39e",
+      500: "#7a7a75",
+      600: "#5d5d59",
+      700: "#4a4a47",
+      800: "#363634",
+      900: "#262625",
+      950: "#161615"
+    };
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            uis: UIS_VERDE,
+            emerald: UIS_VERDE,
+            teal: UIS_VERDE,
+            slate: UIS_GRIS
+          },
+          fontFamily: {
+            sans: ["Humanst521", "'Gill Sans'", "'Gill Sans MT'", "Calibri", "system-ui", "sans-serif"],
+            condensed: ["Humanst521 Cn", "Humanst521", "'Gill Sans'", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
   <style>
-    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    /* ===== Tipografía institucional UIS: Humanst521 BT =====
+       Los pesos 600-900 (semibold, bold, extrabold, black) usan Humanst521 Bold
+       para mantener la legibilidad de la familia institucional. */
+    @font-face { font-family: "Humanst521"; src: url("/static/fonts/humanst521-light.ttf") format("truetype"); font-weight: 100 300; font-style: normal; font-display: swap; }
+    @font-face { font-family: "Humanst521"; src: url("/static/fonts/humanst521-roman.ttf") format("truetype"); font-weight: 400 500; font-style: normal; font-display: swap; }
+    @font-face { font-family: "Humanst521"; src: url("/static/fonts/humanst521-italic.ttf") format("truetype"); font-weight: 400 500; font-style: italic; font-display: swap; }
+    @font-face { font-family: "Humanst521"; src: url("/static/fonts/humanst521-bold.ttf") format("truetype"); font-weight: 600 900; font-style: normal; font-display: swap; }
+    @font-face { font-family: "Humanst521"; src: url("/static/fonts/humanst521-bolditalic.ttf") format("truetype"); font-weight: 600 900; font-style: italic; font-display: swap; }
+    @font-face { font-family: "Humanst521 Cn"; src: url("/static/fonts/humanst521-cn.ttf") format("truetype"); font-weight: 400 500; font-style: normal; font-display: swap; }
+    @font-face { font-family: "Humanst521 Cn"; src: url("/static/fonts/humanst521-cn-bold.ttf") format("truetype"); font-weight: 600 900; font-style: normal; font-display: swap; }
+
+    :root {
+      --uis-verde: #67b93e;
+      --uis-verde-oscuro: #437d27;
+      --uis-gris: #4a4a47;
+    }
+    body {
+      font-family: "Humanst521", "Gill Sans", "Gill Sans MT", Calibri, system-ui, sans-serif;
+      background-color: #f3f4f1;
+      background-image:
+        radial-gradient(circle at 100% 0%, rgba(103, 185, 62, 0.07) 0, transparent 38%),
+        radial-gradient(circle at 0% 100%, rgba(103, 185, 62, 0.05) 0, transparent 32%);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
+    }
+    /* Línea institucional verde superior (estructura de marca UIS) */
+    .uis-franja {
+      height: 6px;
+      background: linear-gradient(90deg, var(--uis-verde-oscuro) 0%, var(--uis-verde) 45%, var(--uis-verde) 100%);
+    }
+    .uis-divider { width: 2px; background: var(--uis-verde); border-radius: 1px; }
+    .uis-titulo-seccion {
+      position: relative;
+      padding-left: 0.65rem;
+    }
+    .uis-titulo-seccion::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 0.1em; bottom: 0.1em;
+      width: 4px;
+      border-radius: 2px;
+      background: var(--uis-verde);
+    }
+    /* Tarjetas con acento superior verde institucional */
+    .uis-card {
+      border-top: 3px solid var(--uis-verde) !important;
+    }
     .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-    .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #a3d383; border-radius: 3px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #67b93e; }
+    ::selection { background: rgba(103, 185, 62, 0.28); }
+    @keyframes pulse-border {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(103, 185, 62, 0.45); }
+      50% { box-shadow: 0 0 0 6px rgba(103, 185, 62, 0); }
+    }
+    .executing-card {
+      animation: pulse-border 1.4s infinite;
+    }
+    @keyframes flow-arrow {
+      0% { transform: translateX(-3px); opacity: 0.5; }
+      50% { transform: translateX(3px); opacity: 1; }
+      100% { transform: translateX(-3px); opacity: 0.5; }
+    }
+    .arrow-flowing {
+      animation: flow-arrow 1s infinite ease-in-out;
+    }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+<body class="text-slate-800 min-h-screen flex flex-col">
 
   <!-- HEADER INSTITUCIONAL UIS - DARA -->
-  <header class="bg-emerald-900 text-white shadow-md border-b border-emerald-700">
-    <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <div class="bg-emerald-700 text-white font-black px-3 py-1.5 rounded-lg text-lg tracking-wider border border-emerald-500">
-          UIS · DARA
-        </div>
+  <header class="bg-white shadow-sm">
+    <div class="uis-franja"></div>
+    <div class="max-w-[1650px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-4">
+        <img src="/static/img/logo-uis-trim.png" alt="Universidad Industrial de Santander"
+          class="h-12 sm:h-14 w-auto select-none" draggable="false" />
+        <div class="uis-divider self-stretch hidden sm:block"></div>
         <div>
-          <h1 class="text-lg font-bold leading-tight">
+          <div class="text-[11px] uppercase tracking-[0.18em] text-emerald-700 font-bold">
+            Dirección de Admisiones y Registro Académico · DARA
+          </div>
+          <h1 class="text-base sm:text-xl font-bold leading-tight text-slate-800">
             Sistema Agéntico de Selección de Aspirantes a Pregrado (Procedimiento PAR.01)
           </h1>
-          <p class="text-xs text-emerald-200">
+          <p class="text-xs text-slate-500">
             Auditoría Documental Multimodal (PDF/Imagen) + Motor Determinista de Mérito + Copiloto Conversacional
           </p>
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
-        <span id="badge-ia" class="text-xs px-2.5 py-1 rounded-full bg-emerald-800 border border-emerald-600 text-emerald-100 font-medium">
-          Motor IA: Cargando...
+      <!-- INDICADOR EN VIVO DEL MOTOR LLM -->
+      <button onclick="abrirModalConfigIA()" id="btn-status-ia"
+        class="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 font-semibold transition shadow-sm"
+        title="Haz clic para configurar o probar la conexión en vivo con Google Gemini API">
+        <span id="dot-ia" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="badge-ia">Motor IA: Verificando...</span>
+        <span class="text-[10px] bg-white px-1.5 py-0.5 rounded text-emerald-800 border border-emerald-300">⚙️ API / Test</span>
+      </button>
+    </div>
+
+    <!-- BARRA DE ACCIONES EN VERDE INSTITUCIONAL -->
+    <div class="bg-emerald-500 border-t border-emerald-600/40 shadow-inner">
+      <div class="max-w-[1650px] mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2">
+        <span class="text-white text-xs font-bold tracking-wide uppercase hidden md:inline">
+          Panel del Coordinador de Admisiones
         </span>
-        <button onclick="ejecutarFlujoCompleto()" class="bg-amber-400 hover:bg-amber-300 text-slate-900 font-semibold text-xs px-3.5 py-2 rounded-lg shadow transition">
-          ▶ Ejecutar Todo el Proceso PAR.01
-        </button>
-        <button onclick="abrirModalActa()" class="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-xs px-3.5 py-2 rounded-lg border border-emerald-500 transition">
-          📄 Informe Comité y Acta Consejo
-        </button>
-        <button onclick="reiniciarEscenario()" class="bg-slate-800 hover:bg-slate-700 text-slate-100 font-medium text-xs px-3 py-2 rounded-lg border border-slate-600 transition">
-          ↺ Reiniciar Escenario Demo
-        </button>
+        <div class="flex flex-wrap items-center gap-2">
+          <button id="btn-ejecutar-todo" onclick="ejecutarFlujoCompletoPasoAPaso()"
+            class="bg-white hover:bg-emerald-50 text-emerald-800 font-bold text-xs px-3.5 py-2 rounded-lg shadow transition flex items-center gap-1.5">
+            <span>▶</span>
+            <span>Ejecutar Todo el Pipeline PAR.01 (En Vivo)</span>
+          </button>
+          <button onclick="abrirModalActa()"
+            class="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs px-3 py-2 rounded-lg border border-emerald-800/40 shadow-sm transition">
+            📄 Informe Comité y Acta Consejo
+          </button>
+          <button onclick="reiniciarEscenario()"
+            class="bg-transparent hover:bg-white/15 text-white font-semibold text-xs px-3 py-2 rounded-lg border border-white/70 transition">
+            ↺ Reiniciar Escenario Demo
+          </button>
+        </div>
       </div>
     </div>
   </header>
 
   <!-- CONTENIDO PRINCIPAL: DASHBOARD + SIDEBAR COPILOTO -->
-  <main class="max-w-[1600px] w-full mx-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4">
+  <main class="max-w-[1650px] w-full mx-auto flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4">
 
-    <!-- COLUMNA IZQUIERDA (8/12): PIPELINE PAR.01, PROGRAMAS Y TABLA DE ASPIRANTES -->
+    <!-- COLUMNA IZQUIERDA (8/12): MONITOR IA EN VIVO, PIPELINE VISUAL CON FLECHAS, PROGRAMAS Y TABLA -->
     <section class="lg:col-span-8 flex flex-col gap-4">
 
-      <!-- PIPELINE POR ETAPAS PAR.01 -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-600">
-            Pipeline Operativo del Procedimiento PAR.01 (Ejecución por Etapas)
-          </h2>
-          <span id="status-banner" class="text-xs text-emerald-700 font-medium">Listo para operar</span>
+      <!-- MONITOR EN VIVO: ESTADO DE USO DEL LLM Y ARQUITECTURA HÍBRIDA (CON LLM VS SIN LLM) -->
+      <div class="bg-white rounded-xl shadow-md shadow-slate-300/40 border border-slate-200 overflow-hidden">
+        <!-- Barra superior en vivo -->
+        <div id="live-monitor-bar" class="bg-slate-800 text-white px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 border-b-[3px] border-emerald-500">
+          <div class="flex items-center gap-2.5">
+            <span id="live-motor-pill" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-600/20 text-emerald-300 border border-emerald-500/40">
+              <span id="live-motor-icon">📡</span>
+              <span id="live-motor-label">Monitor de Ejecución en Vivo</span>
+            </span>
+            <span id="live-activity-text" class="text-xs text-slate-200 font-medium">
+              Esperando ejecución de etapa o consulta en el Copiloto...
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2 text-[11px]">
+            <span class="bg-indigo-950/90 text-indigo-200 border border-indigo-700/70 px-2 py-0.5 rounded font-mono">
+              🤖 Llamadas LLM: <strong id="counter-llm">0</strong>
+            </span>
+            <span class="bg-slate-800 text-slate-200 border border-slate-600 px-2 py-0.5 rounded font-mono">
+              ⚙️ Reglas Deterministas: <strong id="counter-det">0</strong>
+            </span>
+            <button onclick="togglePanelArquitectura()" class="text-emerald-300 hover:text-white underline font-semibold ml-1">
+              <span id="btn-toggle-arq-text">Ver detalle ¿Qué usa LLM vs Sin LLM? ▾</span>
+            </button>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
-          <button onclick="ejecutarEtapa('/api/proceso/auditar-soportes', 'Auditoría Multimodal IA de Soportes')"
-            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
-            <div class="text-[11px] font-bold text-emerald-700">ETAPA 1 · VISIÓN IA</div>
-            <div class="text-xs font-semibold text-slate-800 mt-0.5">Auditar Soportes PDF/PNG</div>
-            <div class="text-[11px] text-slate-500 mt-1">Saber 11°, Diploma y Voto</div>
-          </button>
+        <!-- Desglose explícito: ¿Qué procesos se hacen CON el LLM y cuáles SIN el LLM? + Bitácora en vivo -->
+        <div id="panel-arquitectura-hibrida" class="p-3.5 bg-slate-50/80 border-b border-slate-200 grid grid-cols-1 md:grid-cols-12 gap-3 text-xs">
+          <!-- Procesos CON LLM -->
+          <div class="md:col-span-4 bg-indigo-50/70 border border-indigo-200 rounded-lg p-3">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-bold text-indigo-950 flex items-center gap-1.5 text-xs">
+                🤖 Procesos CON el Modelo LLM (Gemini)
+              </span>
+              <span id="tag-estado-llm-card" class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-indigo-100 text-indigo-800 border border-indigo-300">
+                IA Cognitiva
+              </span>
+            </div>
+            <p class="text-[11px] text-indigo-900/80 mb-2">
+              El LLM interviene únicamente en visión documental, redacción formal y orquestación conversacional:
+            </p>
+            <ul class="space-y-1 text-[11px] text-slate-700">
+              <li class="flex items-start gap-1.5">
+                <span class="text-indigo-600 font-bold">1.</span>
+                <span><strong>Visión Multimodal (Etapa 1):</strong> Extrae JSON estructurado desde PDFs e imágenes (Saber 11°, Diploma y Voto).</span>
+              </li>
+              <li class="flex items-start gap-1.5">
+                <span class="text-indigo-600 font-bold">2.</span>
+                <span><strong>Notificación ICFES (Paso 4):</strong> Redacta el dictamen jurídico de inconsistencia hacia <code class="text-[10px]">admisiones@uis.edu.co</code>.</span>
+              </li>
+              <li class="flex items-start gap-1.5">
+                <span class="text-indigo-600 font-bold">3.</span>
+                <span><strong>Actas y Cartas (Pasos 8-12):</strong> Redacta el Dictamen del Comité/Consejo Académico y nota de Cartas de Admisión.</span>
+              </li>
+              <li class="flex items-start gap-1.5">
+                <span class="text-indigo-600 font-bold">4.</span>
+                <span><strong>Copiloto DARA (Tool Calling):</strong> Decide qué herramientas invocar y explica decisiones con trazabilidad.</span>
+              </li>
+            </ul>
+          </div>
 
-          <button onclick="ejecutarEtapa('/api/proceso/paso4-icfes', 'Paso 4: Cruce con Base Oficial ICFES')"
-            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
-            <div class="text-[11px] font-bold text-emerald-700">PASO 4 · CRUCE ICFES</div>
-            <div class="text-xs font-semibold text-slate-800 mt-0.5">Verificar SNP y Puntajes</div>
-            <div class="text-[11px] text-slate-500 mt-1">Detecta inconsistencias</div>
-          </button>
+          <!-- Procesos SIN LLM (Deterministas) -->
+          <div class="md:col-span-4 bg-emerald-50/70 border border-emerald-200 rounded-lg p-3">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-bold text-emerald-950 flex items-center gap-1.5 text-xs">
+                ⚙️ Procesos SIN el LLM (100% Deterministas)
+              </span>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                0 Alucinaciones
+              </span>
+            </div>
+            <p class="text-[11px] text-emerald-900/80 mb-2">
+              Ejecutados en Python puro (<code class="font-mono text-[10px]">rules_engine.py</code>) para garantizar exactitud matemática y equidad:
+            </p>
+            <ul class="space-y-1 text-[11px] text-slate-700">
+              <li class="flex items-start gap-1.5">
+                <span class="text-emerald-700 font-bold">1.</span>
+                <span><strong>Tarifas SISBÉN (Sección 6):</strong> Liquidación exacta en SMLMV (Grupos A, B, C1-C10, Otros; máx. 2 opciones).</span>
+              </li>
+              <li class="flex items-start gap-1.5">
+                <span class="text-emerald-700 font-bold">2.</span>
+                <span><strong>Cruce Numérico ICFES (Paso 4):</strong> Confrontación exacta de SNP, documento, año y los 6 puntajes vs base oficial.</span>
+              </li>
+              <li class="flex items-start gap-1.5">
+                <span class="text-emerald-700 font-bold">3.</span>
+                <span><strong>Filtro Eliminatorio (Paso 5):</strong> Validación de puntaje <code class="font-mono">&ge; 31.0</code> por área y vigencia <code class="font-mono">&le; 5 años</code> (<code class="font-mono">&ge; 2012</code>).</span>
+              </li>
+              <li class="flex items-start gap-1.5">
+                <span class="text-emerald-700 font-bold">4.</span>
+                <span><strong>Mérito, 5 Desempates y P.F.U. (Pasos 6-7):</strong> Promedio ponderado a 4 decimales, cascada de 5 desempates y corrimiento de cupo.</span>
+              </li>
+            </ul>
+          </div>
 
-          <button onclick="ejecutarEtapa('/api/proceso/paso5-requisitos', 'Paso 5: Puntajes Mínimos y Vigencia')"
-            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
-            <div class="text-[11px] font-bold text-emerald-700">PASO 5 · FILTRO MÍNIMO</div>
-            <div class="text-xs font-semibold text-slate-800 mt-0.5">Validar &ge; 31 pts y &le; 5 años</div>
-            <div class="text-[11px] text-slate-500 mt-1">Anula exámenes vencidos</div>
-          </button>
+          <!-- Bitácora en vivo de llamadas al motor -->
+          <div class="md:col-span-4 bg-slate-900 text-slate-100 rounded-lg p-3 flex flex-col justify-between max-h-[195px]">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-1.5 mb-1.5">
+              <span class="font-bold text-[11px] text-emerald-400 uppercase tracking-wider">
+                ⚡ Bitácora en Vivo (LLM vs Reglas)
+              </span>
+              <span id="live-model-active-name" class="text-[10px] font-mono text-slate-400">Listo</span>
+            </div>
+            <div id="live-events-feed" class="flex-1 overflow-y-auto custom-scroll space-y-1.5 text-[11px] font-mono pr-1">
+              <div class="text-slate-400 text-[11px]">Aún no se han ejecutado operaciones en esta sesión.</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-          <button onclick="ejecutarEtapa('/api/proceso/pasos6-7-seleccion', 'Pasos 6 y 7: Selección, Desempates y P.F.U.')"
-            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
-            <div class="text-[11px] font-bold text-emerald-700">PASOS 6 Y 7 · MÉRITO</div>
-            <div class="text-xs font-semibold text-slate-800 mt-0.5">Ponderar + 5 Desempates</div>
-            <div class="text-[11px] text-slate-500 mt-1">Cruza P.F.U. y corre cupo</div>
-          </button>
+      <!-- PIPELINE OPERATIVO VISUAL CON FLECHAS, INDICADORES DE ESTADO Y RESULTADOS -->
+      <div class="uis-card bg-white rounded-xl shadow-md shadow-slate-300/40 border border-slate-200 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div>
+            <h2 class="uis-titulo-seccion text-sm font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+              <span>Pipeline Operativo del Procedimiento PAR.01 (Flujo Secuencial por Etapas)</span>
+            </h2>
+            <p class="text-[11px] text-slate-500">
+              Haz clic en cualquier etapa para ejecutarla individualmente o usa <strong>«Ejecutar Todo el Pipeline PAR.01»</strong> para recorrer el flujo completo en vivo.
+            </p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="status-banner" class="text-xs px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold">
+              Listo para operar
+            </span>
+          </div>
+        </div>
 
-          <button onclick="ejecutarEtapa('/api/proceso/paso12-cartas', 'Paso 12: Códigos UIS, Hojas de Vida y Cartas')"
-            class="text-left p-3 rounded-lg border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/40 transition group">
-            <div class="text-[11px] font-bold text-emerald-700">PASOS 8-12 · CIERRE</div>
-            <div class="text-xs font-semibold text-slate-800 mt-0.5">Expedir Códigos y Cartas</div>
-            <div class="text-[11px] text-slate-500 mt-1">Hoja de vida académica</div>
-          </button>
+        <!-- Barra de progreso general del Pipeline -->
+        <div class="mb-4">
+          <div class="flex items-center justify-between text-[11px] text-slate-600 mb-1">
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="font-semibold">Progreso del Flujo PAR.01: <strong id="pipeline-progress-text" class="text-emerald-700">0/5 etapas completadas (0%)</strong></span>
+              <span class="inline-flex items-center gap-1 text-[10px] text-slate-500">
+                <span class="w-2 h-2 rounded-full bg-indigo-600 inline-block"></span> 🤖 Con LLM
+              </span>
+              <span class="inline-flex items-center gap-1 text-[10px] text-slate-500">
+                <span class="w-2 h-2 rounded-full bg-amber-600 inline-block"></span> 🔀 Híbrido (Reglas + LLM)
+              </span>
+              <span class="inline-flex items-center gap-1 text-[10px] text-slate-500">
+                <span class="w-2 h-2 rounded-full bg-slate-700 inline-block"></span> ⚙️ 100% Sin LLM (Determinista)
+              </span>
+            </div>
+          </div>
+          <div class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+            <div id="pipeline-progress-bar" class="h-full bg-gradient-to-r from-emerald-700 to-emerald-400 transition-all duration-500" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Contenedor del flujo con tarjetas y flechas conectoras -->
+        <div id="pipeline-stages-container" class="flex flex-col xl:flex-row items-stretch justify-between gap-2">
+          <!-- Renderizado dinámicamente por renderizarPipeline() -->
         </div>
       </div>
 
       <!-- TARJETAS DE MÉTRICAS Y PROGRAMAS OFERTADOS -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
-          <div class="text-xs text-slate-500">Total Inscritos</div>
-          <div id="metric-inscritos" class="text-2xl font-black text-slate-800">0</div>
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200 border-l-4 border-l-slate-500 shadow-sm">
+          <div class="text-xs text-slate-500 font-semibold uppercase tracking-wide">Total Inscritos</div>
+          <div id="metric-inscritos" class="text-3xl font-black text-slate-800">0</div>
         </div>
-        <div class="bg-white p-3.5 rounded-xl border border-emerald-200 shadow-sm">
-          <div class="text-xs text-emerald-700 font-medium">Admitidos (1ra y 2da Op.)</div>
-          <div id="metric-admitidos" class="text-2xl font-black text-emerald-700">0</div>
+        <div class="bg-white p-3.5 rounded-xl border border-emerald-200 border-l-4 border-l-emerald-500 shadow-sm">
+          <div class="text-xs text-emerald-700 font-semibold uppercase tracking-wide">Admitidos (1ra y 2da Op.)</div>
+          <div id="metric-admitidos" class="text-3xl font-black text-emerald-600">0</div>
         </div>
-        <div class="bg-white p-3.5 rounded-xl border border-amber-200 shadow-sm">
-          <div class="text-xs text-amber-700 font-medium">No Admitidos (Por Cupo)</div>
-          <div id="metric-no-admitidos" class="text-2xl font-black text-amber-600">0</div>
+        <div class="bg-white p-3.5 rounded-xl border border-amber-200 border-l-4 border-l-amber-500 shadow-sm">
+          <div class="text-xs text-amber-700 font-semibold uppercase tracking-wide">No Admitidos (Por Cupo)</div>
+          <div id="metric-no-admitidos" class="text-3xl font-black text-amber-600">0</div>
         </div>
-        <div class="bg-white p-3.5 rounded-xl border border-rose-200 shadow-sm">
-          <div class="text-xs text-rose-700 font-medium">Anulados / Inhabilitados</div>
-          <div id="metric-anulados" class="text-2xl font-black text-rose-600">0</div>
+        <div class="bg-white p-3.5 rounded-xl border border-rose-200 border-l-4 border-l-rose-500 shadow-sm">
+          <div class="text-xs text-rose-700 font-semibold uppercase tracking-wide">Anulados / Inhabilitados</div>
+          <div id="metric-anulados" class="text-3xl font-black text-rose-600">0</div>
         </div>
       </div>
 
       <!-- PROGRAMAS ACADÉMICOS Y PONDERACIONES POR FACULTAD -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2.5">
+      <div class="uis-card bg-white rounded-xl shadow-md shadow-slate-300/40 border border-slate-200 p-4">
+        <h3 class="uis-titulo-seccion text-xs font-bold uppercase tracking-wider text-slate-700 mb-2.5">
           Oferta Académica y Pesos Ponderados por Facultad (Sección 4 PAR.01)
         </h3>
         <div id="contenedor-programas" class="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-xs"></div>
       </div>
 
       <!-- TABLA INTERACTIVA DE ASPIRANTES -->
-      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4 flex-1 flex flex-col">
+      <div class="uis-card bg-white rounded-xl shadow-md shadow-slate-300/40 border border-slate-200 p-4 flex-1 flex flex-col">
         <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div>
-            <h2 class="text-sm font-bold text-slate-800">
+            <h2 class="uis-titulo-seccion text-sm font-bold uppercase tracking-wider text-slate-800">
               Registro de Aspirantes, Soportes Documentales y Trazabilidad de Decisiones
             </h2>
             <p class="text-xs text-slate-500">
-              Haz clic en «Expediente / Soportes» para auditar documentos PDF/PNG, subir nuevos archivos o ver cartas y notificaciones.
+              Haz clic en «Expediente / Soportes» para auditar documentos PDF/PNG en vivo con Gemini Vision, subir archivos o ver cartas y notificaciones.
             </p>
           </div>
 
           <div class="flex items-center gap-2">
-            <select id="filtro-programa" onchange="cargarAspirantes()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+            <select id="filtro-programa" onchange="cargarAspirantes()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-500">
               <option value="">Todos los Programas</option>
             </select>
-            <select id="filtro-estado" onchange="cargarAspirantes()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white">
+            <select id="filtro-estado" onchange="cargarAspirantes()" class="text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-500">
               <option value="">Todos los Estados</option>
               <option value="ADMITIDO">ADMITIDO</option>
               <option value="NO_ADMITIDO">NO_ADMITIDO</option>
@@ -160,7 +406,7 @@
         <div class="overflow-x-auto custom-scroll">
           <table class="w-full text-left border-collapse text-xs">
             <thead>
-              <tr class="border-b border-slate-200 bg-slate-50 text-slate-600 uppercase text-[11px]">
+              <tr class="border-b-2 border-emerald-500 bg-emerald-50 text-emerald-900 uppercase text-[11px] tracking-wide">
                 <th class="py-2.5 px-2">Turno</th>
                 <th class="py-2.5 px-2">Aspirante / Doc / SNP</th>
                 <th class="py-2.5 px-2">Opciones (1ra / 2da)</th>
@@ -178,16 +424,18 @@
     </section>
 
     <!-- COLUMNA DERECHA (4/12): PANEL LATERAL DE CHAT COPILOTO DARA -->
-    <aside class="lg:col-span-4 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[780px]">
-      <div class="p-4 border-b border-slate-200 bg-slate-900 text-white rounded-t-xl">
+    <aside class="lg:col-span-4 bg-white rounded-xl shadow-md shadow-slate-300/40 border border-slate-200 flex flex-col h-[840px] overflow-hidden">
+      <div class="p-4 border-b-[3px] border-emerald-700 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-bold flex items-center gap-2">
             <span>🤖 Copiloto Conversacional DARA</span>
           </h2>
-          <span class="text-[11px] bg-emerald-600 px-2 py-0.5 rounded font-semibold">Tool Calling Activo</span>
+          <span id="badge-copiloto-modo" class="text-[11px] bg-emerald-800 px-2 py-0.5 rounded font-semibold">
+            Tool Calling Activo
+          </span>
         </div>
-        <p class="text-xs text-slate-300 mt-1">
-          Consulta causales de desempate, inhabilidades P.F.U., auditoría de soportes o solicita ejecutar etapas del procedimiento PAR.01.
+        <p class="text-xs text-emerald-50 mt-1">
+          El LLM razona sobre tus preguntas e invoca herramientas deterministas (<code class="text-white font-bold bg-emerald-700/50 px-1 rounded">tools</code>) sobre SQLite sin inventar puntajes.
         </p>
       </div>
 
@@ -217,29 +465,98 @@
 
       <!-- HISTORIAL DE MENSAJES -->
       <div id="chat-mensajes" class="flex-1 p-4 overflow-y-auto custom-scroll space-y-3 text-xs">
-        <div class="bg-slate-100 border border-slate-200 rounded-lg p-3 text-slate-700">
+        <div class="bg-emerald-50 border border-emerald-200 border-l-4 border-l-emerald-500 rounded-lg p-3 text-slate-700">
           <div class="font-bold text-emerald-800 mb-1">Copiloto DARA - UIS</div>
-          Bienvenido, Coordinador. Estoy conectado a la base de datos SQLite y a las herramientas deterministas del procedimiento <strong>PAR.01</strong>. ¿Qué etapa o aspirante deseas auditar hoy?
+          Bienvenido, Coordinador. Estoy conectado a la base de datos SQLite y a las herramientas deterministas del procedimiento <strong>PAR.01</strong>. Cada respuesta indicará en vivo si fue generada por el <strong>modelo LLM (Gemini)</strong> y qué herramientas deterministas se ejecutaron.
         </div>
       </div>
 
       <!-- FORMULARIO DE ENTRADA DEL CHAT -->
-      <form onsubmit="enviarMensajeChat(event)" class="p-3 border-t border-slate-200 flex gap-2">
+      <form onsubmit="enviarMensajeChat(event)" class="p-3 border-t border-slate-200 bg-slate-50 flex gap-2">
         <input id="chat-input" type="text" placeholder="Pregunta por un aspirante, desempate o pide ejecutar una etapa..."
-          class="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 focus:outline-none focus:border-emerald-600" />
-        <button type="submit" class="bg-emerald-700 hover:bg-emerald-600 text-white font-semibold text-xs px-4 py-2 rounded-lg transition">
+          class="flex-1 text-xs border border-slate-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-500" />
+        <button id="btn-chat-enviar" type="submit" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs px-4 py-2 rounded-lg shadow-sm transition">
           Enviar
         </button>
       </form>
     </aside>
   </main>
 
+  <!-- PIE DE PÁGINA INSTITUCIONAL UIS -->
+  <footer class="mt-2 bg-slate-800 text-slate-300 border-t-[5px] border-emerald-500">
+    <div class="max-w-[1650px] mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-3">
+        <img src="/static/img/logo-uis-simbolo.png" alt="Símbolo UIS" class="h-9 w-auto rounded bg-white p-0.5" draggable="false" />
+        <div>
+          <div class="font-bold text-white text-sm leading-tight">Universidad Industrial de Santander</div>
+          <div class="text-slate-400">Dirección de Admisiones y Registro Académico · DARA — Procedimiento PAR.01</div>
+        </div>
+      </div>
+      <div class="text-slate-400 text-right">
+        Bucaramanga, Santander · Colombia
+      </div>
+    </div>
+  </footer>
+
+  <!-- MODAL DE CONFIGURACIÓN Y PRUEBA EN VIVO DE GEMINI API KEY -->
+  <div id="modal-config-ia" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
+      <div class="px-5 py-3.5 bg-emerald-500 text-white flex items-center justify-between border-b-[3px] border-emerald-700">
+        <h3 class="text-sm font-bold flex items-center gap-2">
+          <span>🔑 Configuración y Estado en Vivo del Modelo LLM (Google Gemini)</span>
+        </h3>
+        <button onclick="cerrarModalConfigIA()" class="text-emerald-50 hover:text-white text-lg font-bold">&times;</button>
+      </div>
+      <div class="p-5 space-y-4 text-xs">
+        <div id="config-ia-status-box" class="p-3 rounded-lg border bg-slate-50 border-slate-200">
+          Cargando estado del motor IA...
+        </div>
+
+        <form onsubmit="guardarConfigGemini(event)" class="space-y-3">
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">
+              Clave <code class="text-emerald-700">GEMINI_API_KEY</code> (Google AI Studio):
+            </label>
+            <input id="input-gemini-key" type="password" placeholder="Pega aquí tu GEMINI_API_KEY (AIzaSy...) o déjalo vacío para mantener la actual"
+              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:border-emerald-500" />
+            <p class="text-[11px] text-slate-500 mt-1">
+              Se guarda automáticamente en <code class="font-mono">.env</code> y se activa en caliente en el servidor sin necesidad de reiniciar <code class="font-mono">uvicorn</code>.
+            </p>
+          </div>
+
+          <div>
+            <label class="block font-bold text-slate-700 mb-1">Modelo Preferido:</label>
+            <select id="input-gemini-model" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs bg-white">
+              <option value="gemini-3.5-flash-lite" selected>gemini-3.5-flash-lite (Por defecto · Visión Multimodal y Tool Calling)</option>
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+              <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+              <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between pt-2 border-t border-slate-200 gap-2">
+            <button type="button" onclick="probarConexionGeminiEnVivo()"
+              class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3.5 py-2 rounded-lg transition">
+              ⚡ Probar Llamada en Vivo a Gemini
+            </button>
+            <button type="submit"
+              class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg shadow-sm transition">
+              💾 Guardar y Activar LLM
+            </button>
+          </div>
+        </form>
+
+        <div id="config-ia-test-result" class="hidden p-3 rounded-lg border text-xs font-mono whitespace-pre-wrap"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL DE EXPEDIENTE DEL ASPIRANTE, SOPORTES PDF/PNG Y CARTA DE ADMISIÓN -->
   <div id="modal-expediente" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-      <div class="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between">
+      <div class="px-5 py-3.5 bg-emerald-500 text-white flex items-center justify-between border-b-[3px] border-emerald-700">
         <h3 id="modal-exp-titulo" class="text-sm font-bold">Expediente del Aspirante</h3>
-        <button onclick="cerrarModalExpediente()" class="text-slate-300 hover:text-white text-lg font-bold">&times;</button>
+        <button onclick="cerrarModalExpediente()" class="text-emerald-50 hover:text-white text-lg font-bold">&times;</button>
       </div>
       <div id="modal-exp-contenido" class="p-5 overflow-y-auto custom-scroll space-y-4 text-xs"></div>
     </div>
@@ -248,9 +565,9 @@
   <!-- MODAL DE INFORME COMITÉ DE ADMISIONES Y ACTA CONSEJO ACADÉMICO -->
   <div id="modal-acta" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
     <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-      <div class="px-5 py-3.5 bg-emerald-900 text-white flex items-center justify-between">
+      <div class="px-5 py-3.5 bg-emerald-500 text-white flex items-center justify-between border-b-[3px] border-emerald-700">
         <h3 class="text-sm font-bold">Informe Técnico Comité de Admisiones y Proyecto de Acta Consejo Académico (Pasos 8 y 9)</h3>
-        <button onclick="cerrarModalActa()" class="text-emerald-200 hover:text-white text-lg font-bold">&times;</button>
+        <button onclick="cerrarModalActa()" class="text-emerald-50 hover:text-white text-lg font-bold">&times;</button>
       </div>
       <div class="p-5 overflow-y-auto custom-scroll flex-1">
         <pre id="modal-acta-texto" class="bg-slate-900 text-emerald-100 p-4 rounded-lg text-xs whitespace-pre-wrap font-mono leading-relaxed"></pre>
@@ -260,6 +577,9 @@
 
   <script>
     let programasCache = {};
+    let pipelineDataCache = null;
+    let etapaEnEjecucionCodigo = null;
+    let panelArquitecturaAbierto = true;
 
     function badgeEstado(estado) {
       const estilos = {
@@ -278,6 +598,234 @@
       return `<span class="inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold ${cls}">${estado}</span>`;
     }
 
+    function togglePanelArquitectura() {
+      panelArquitecturaAbierto = !panelArquitecturaAbierto;
+      const panel = document.getElementById("panel-arquitectura-hibrida");
+      const txt = document.getElementById("btn-toggle-arq-text");
+      if (panelArquitecturaAbierto) {
+        panel.classList.remove("hidden");
+        txt.textContent = "Ocultar detalle ¿Qué usa LLM vs Sin LLM? ▴";
+      } else {
+        panel.classList.add("hidden");
+        txt.textContent = "Ver detalle ¿Qué usa LLM vs Sin LLM? ▾";
+      }
+    }
+
+    function actualizarMonitorVivo(modo, mensaje, modelo = "") {
+      const pill = document.getElementById("live-motor-pill");
+      const icon = document.getElementById("live-motor-icon");
+      const label = document.getElementById("live-motor-label");
+      const text = document.getElementById("live-activity-text");
+
+      text.textContent = mensaje;
+
+      if (modo === "EJECUTANDO_LLM") {
+        pill.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-600 text-white border border-indigo-400 animate-pulse";
+        icon.textContent = "🤖";
+        label.textContent = `USANDO GEMINI LLM EN VIVO (${modelo || 'Multimodal'})`;
+      } else if (modo === "EJECUTANDO_DETERMINISTA") {
+        pill.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500 text-slate-950 border border-amber-300 animate-pulse";
+        icon.textContent = "⚙️";
+        label.textContent = "EJECUTANDO MOTOR DETERMINISTA (SIN LLM)";
+      } else if (modo === "EJECUTANDO_HIBRIDO") {
+        pill.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-600 text-white border border-teal-400 animate-pulse";
+        icon.textContent = "🔀";
+        label.textContent = `EJECUTANDO MODO HÍBRIDO (REGLAS + ${modelo || 'LLM'})`;
+      } else if (modo === "COMPLETADO_LLM") {
+        pill.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-600/30 text-emerald-300 border border-emerald-500/50";
+        icon.textContent = "✓🤖";
+        label.textContent = `LLM Activo (${modelo})`;
+      } else {
+        pill.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-600";
+        icon.textContent = "✓⚙️";
+        label.textContent = "Motor Determinista Listo";
+      }
+    }
+
+    function renderizarTelemetriaIA(telemetria, geminiConfigurado, modeloIA) {
+      const badgeIa = document.getElementById("badge-ia");
+      const dotIa = document.getElementById("dot-ia");
+      const badgeCopiloto = document.getElementById("badge-copiloto-modo");
+      const tagCard = document.getElementById("tag-estado-llm-card");
+      const modelActiveName = document.getElementById("live-model-active-name");
+
+      if (geminiConfigurado) {
+        const modNombre = telemetria.ultimo_modelo_exitoso || modeloIA;
+        badgeIa.textContent = `LLM En Vivo: ${modNombre} (${telemetria.llamadas_llm_exitosas} llamadas)`;
+        dotIa.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse";
+        badgeCopiloto.textContent = `🤖 ${modNombre} + Tools`;
+        badgeCopiloto.className = "text-[11px] bg-indigo-600 text-white px-2 py-0.5 rounded font-semibold";
+        tagCard.textContent = `🟢 Online (${modNombre})`;
+        tagCard.className = "text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 border border-emerald-300";
+        modelActiveName.textContent = `Modelo: ${modNombre}`;
+      } else {
+        badgeIa.textContent = "Sin API Key en Servidor · Respaldo Determinista";
+        dotIa.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
+        badgeCopiloto.textContent = "⚙️ Orquestador Determinista";
+        badgeCopiloto.className = "text-[11px] bg-slate-700 text-slate-200 px-2 py-0.5 rounded font-semibold";
+        tagCard.textContent = "🟡 Modo Respaldo (Sin API Key)";
+        tagCard.className = "text-[10px] px-1.5 py-0.5 rounded font-bold bg-amber-100 text-amber-800 border border-amber-300";
+        modelActiveName.textContent = "Modo: Respaldo Local";
+      }
+
+      document.getElementById("counter-llm").textContent = telemetria.llamadas_llm_exitosas || 0;
+      document.getElementById("counter-det").textContent = telemetria.procesos_deterministas_ejecutados || 0;
+
+      const feed = document.getElementById("live-events-feed");
+      const eventos = telemetria.eventos_recientes || [];
+      if (eventos.length === 0) {
+        feed.innerHTML = `<div class="text-slate-400 text-[11px]">Sin eventos registrados aún. Ejecuta una etapa del pipeline para ver la traza en vivo.</div>`;
+      } else {
+        feed.innerHTML = eventos.map(ev => {
+          const badge = ev.uso_llm
+            ? `<span class="bg-indigo-600 text-white px-1.5 py-0.2 rounded text-[10px] font-bold">🤖 LLM ${ev.modelo} (${ev.latencia_ms}ms)</span>`
+            : `<span class="bg-slate-700 text-slate-200 px-1.5 py-0.2 rounded text-[10px] font-bold">⚙️ SIN LLM (${ev.modelo})</span>`;
+          return `
+            <div class="border-l-2 ${ev.uso_llm ? 'border-indigo-400' : 'border-emerald-500'} pl-2 py-0.5">
+              <div class="flex items-center justify-between gap-1">
+                ${badge}
+                <span class="text-[10px] text-slate-400">${ev.hora_local}</span>
+              </div>
+              <div class="text-slate-200 font-semibold mt-0.5">${ev.proceso}</div>
+              <div class="text-slate-400 text-[10px]">${ev.resumen}</div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
+
+    function renderizarPipeline(pipeline) {
+      if (!pipeline || !pipeline.etapas) return;
+      pipelineDataCache = pipeline;
+
+      document.getElementById("pipeline-progress-text").textContent =
+        `${pipeline.etapas_completadas}/${pipeline.total_etapas} etapas completadas (${pipeline.porcentaje_avance}%)`;
+      document.getElementById("pipeline-progress-bar").style.width = `${pipeline.porcentaje_avance}%`;
+
+      const container = document.getElementById("pipeline-stages-container");
+      let html = "";
+
+      pipeline.etapas.forEach((etapa, idx) => {
+        const estaEjecutando = etapaEnEjecucionCodigo === etapa.codigo;
+        const completada = etapa.completada && !estaEjecutando;
+        const conAlerta = etapa.estado === "COMPLETADO_CON_ALERTA" && !estaEjecutando;
+
+        // Estilos del borde y fondo de la tarjeta según su estado actual
+        let cardClasses = "border-slate-200 bg-white hover:border-emerald-400";
+        let circleClasses = "bg-slate-200 text-slate-700 border-slate-300";
+        let circleContent = `${etapa.numero}`;
+        let statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300">⏳ Pendiente</span>`;
+
+        if (estaEjecutando) {
+          cardClasses = "border-amber-500 bg-amber-50/40 executing-card ring-2 ring-amber-300";
+          circleClasses = "bg-amber-500 text-slate-950 border-amber-600 animate-spin";
+          circleContent = "↻";
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950 border border-amber-500 animate-pulse">🔄 Ejecutando...</span>`;
+        } else if (conAlerta) {
+          cardClasses = "border-emerald-500 bg-emerald-50/20 hover:border-emerald-600";
+          circleClasses = "bg-emerald-600 text-white border-emerald-700";
+          circleContent = "✓";
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">⚠️ Completado (Hallazgos)</span>`;
+        } else if (completada) {
+          cardClasses = "border-emerald-500 bg-emerald-50/20 hover:border-emerald-600";
+          circleClasses = "bg-emerald-600 text-white border-emerald-700";
+          circleContent = "✓";
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">✅ Realizado</span>`;
+        }
+
+        // Badge de naturaleza del motor (CON LLM vs HÍBRIDO vs SIN LLM)
+        let motorBadgeClass = "bg-slate-100 text-slate-700 border-slate-300";
+        if (etapa.naturaleza_motor === "CON_LLM") {
+          motorBadgeClass = etapa.uso_llm_real
+            ? "bg-indigo-100 text-indigo-900 border-indigo-300"
+            : "bg-indigo-50 text-indigo-800 border-indigo-200";
+        } else if (etapa.naturaleza_motor === "HIBRIDO") {
+          motorBadgeClass = "bg-amber-50 text-amber-900 border-amber-300";
+        } else {
+          motorBadgeClass = "bg-slate-100 text-slate-800 border-slate-300";
+        }
+
+        // Caja de resultado obtenido en la etapa
+        const itemsResultadoHtml = (etapa.resultado_items || []).map(item => `
+          <div class="text-[11px] ${completada ? 'text-slate-700 font-medium' : 'text-slate-400'} leading-snug">
+            ${item}
+          </div>
+        `).join("");
+
+        const boxResultadoClasses = estaEjecutando
+          ? "bg-amber-100/70 border-amber-300 text-amber-950"
+          : (completada ? "bg-emerald-50/80 border-emerald-200 text-emerald-950" : "bg-slate-50 border-slate-200 text-slate-500");
+
+        html += `
+          <div onclick="ejecutarEtapaIndividual('${etapa.codigo}', '${etapa.endpoint}', '${etapa.titulo_corto}', '${etapa.naturaleza_motor}')"
+            class="flex-1 rounded-xl border-2 p-3 transition cursor-pointer flex flex-col justify-between shadow-sm ${cardClasses}">
+            <div>
+              <!-- Fila 1: Número de paso + Estado -->
+              <div class="flex items-center justify-between gap-1 mb-2">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-6 h-6 rounded-full border text-xs font-black flex items-center justify-center ${circleClasses}">
+                    ${circleContent}
+                  </span>
+                  <span class="text-[11px] font-black tracking-tight text-emerald-800">${etapa.titulo_corto}</span>
+                </div>
+                ${statusBadge}
+              </div>
+
+              <!-- Fila 2: Indicador explícito de si usa LLM o Motor Determinista -->
+              <div class="mb-2">
+                <span class="inline-block w-full text-center px-2 py-0.5 rounded border text-[10px] font-bold ${motorBadgeClass}"
+                  title="Con LLM: ${etapa.que_hace_llm} | Determinista: ${etapa.que_hace_determinista}">
+                  ${etapa.etiqueta_motor}
+                </span>
+              </div>
+
+              <!-- Fila 3: Título y descripción -->
+              <div class="text-xs font-bold text-slate-800">${etapa.nombre}</div>
+              <div class="text-[11px] text-slate-500 mb-2">${etapa.subtitulo}</div>
+            </div>
+
+            <!-- Fila 4: Caja de Resultado Obtenido -->
+            <div class="mt-1 p-2 rounded-lg border ${boxResultadoClasses}">
+              <div class="text-[10px] uppercase font-bold tracking-wider ${completada ? 'text-emerald-800' : 'text-slate-400'}">
+                ${estaEjecutando ? '⚡ Procesando en vivo...' : (completada ? '📊 Resultado Obtenido:' : 'Estado de Etapa:')}
+              </div>
+              <div class="text-xs font-extrabold mt-0.5">
+                ${estaEjecutando ? 'Ejecutando operaciones...' : etapa.resultado_titulo}
+              </div>
+              <div class="mt-1 space-y-0.5">
+                ${itemsResultadoHtml}
+              </div>
+            </div>
+          </div>
+        `;
+
+        // Flecha conectora hacia la siguiente etapa (excepto después de la última)
+        if (idx < pipeline.etapas.length - 1) {
+          const flechaActiva = completada;
+          const flechaAnimada = estaEjecutando;
+          const colorFlecha = flechaAnimada
+            ? "text-amber-500 arrow-flowing"
+            : (flechaActiva ? "text-emerald-600" : "text-slate-300");
+          const bgFlecha = flechaAnimada
+            ? "bg-amber-100 border-amber-300"
+            : (flechaActiva ? "bg-emerald-100 border-emerald-300" : "bg-slate-100 border-slate-200");
+
+          html += `
+            <div class="flex xl:flex-col items-center justify-center py-1 xl:py-0 xl:px-0.5 select-none">
+              <div class="w-7 h-7 rounded-full border flex items-center justify-center shadow-sm ${bgFlecha} ${colorFlecha}"
+                title="${flechaActiva ? 'Etapa completada -> Continúa al siguiente paso' : 'Flujo hacia la siguiente etapa'}">
+                <!-- Flecha derecha en escritorio, abajo en móvil -->
+                <span class="hidden xl:inline text-sm font-black">➔</span>
+                <span class="xl:hidden text-sm font-black">⬇</span>
+              </div>
+            </div>
+          `;
+        }
+      });
+
+      container.innerHTML = html;
+    }
+
     async function cargarTodo() {
       await cargarStatusYProgramas();
       await cargarAspirantes();
@@ -289,8 +837,12 @@
         fetch("/api/programas").then(r => r.json())
       ]);
 
-      document.getElementById("badge-ia").textContent =
-        resStatus.gemini_configurado ? `Motor IA: ${resStatus.modelo_ia} (Online)` : "Motor IA: Respaldo Determinista Activo";
+      renderizarTelemetriaIA(
+        resStatus.telemetria_ia || {},
+        resStatus.gemini_configurado,
+        resStatus.modelo_ia
+      );
+      renderizarPipeline(resStatus.pipeline);
 
       document.getElementById("metric-inscritos").textContent = resStatus.resumen.total_inscritos;
       document.getElementById("metric-admitidos").textContent = resStatus.resumen.total_admitidos;
@@ -320,6 +872,7 @@
         `;
       });
       selProg.value = valorActual;
+      return resStatus;
     }
 
     async function cargarAspirantes() {
@@ -378,20 +931,73 @@
       });
     }
 
-    async function ejecutarEtapa(url, nombreEtapa) {
+    async function ejecutarEtapaIndividual(codigoEtapa, url, nombreEtapa, naturalezaMotor) {
       const banner = document.getElementById("status-banner");
-      banner.textContent = `Ejecutando ${nombreEtapa}...`;
-      await fetch(url, { method: "POST" });
-      await cargarTodo();
+      etapaEnEjecucionCodigo = codigoEtapa;
+      renderizarPipeline(pipelineDataCache);
+
+      if (naturalezaMotor === "CON_LLM") {
+        actualizarMonitorVivo("EJECUTANDO_LLM", `Ejecutando ${nombreEtapa}: Analizando soportes PDF/PNG con Visión Multimodal IA...`);
+        banner.textContent = `🤖 Invocando LLM en ${nombreEtapa}...`;
+        banner.className = "text-xs px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-300 font-bold animate-pulse";
+      } else if (naturalezaMotor === "HIBRIDO") {
+        actualizarMonitorVivo("EJECUTANDO_HIBRIDO", `Ejecutando ${nombreEtapa}: Aplicando reglas deterministas + Redacción con modelo Gemini LLM...`);
+        banner.textContent = `🔀 Ejecutando Híbrido (Reglas + LLM) en ${nombreEtapa}...`;
+        banner.className = "text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold animate-pulse";
+      } else {
+        actualizarMonitorVivo("EJECUTANDO_DETERMINISTA", `Ejecutando ${nombreEtapa}: Cálculo 100% determinista en Python (rules_engine.py, sin LLM)...`);
+        banner.textContent = `⚙️ Ejecutando Motor Determinista en ${nombreEtapa}...`;
+        banner.className = "text-xs px-2.5 py-1 rounded-full bg-slate-200 text-slate-800 border border-slate-400 font-bold animate-pulse";
+      }
+
+      const resEtapa = await fetch(url, { method: "POST" }).then(r => r.json());
+      etapaEnEjecucionCodigo = null;
+      const statusActual = await cargarStatusYProgramas();
+      await cargarAspirantes();
+
+      if (resEtapa && resEtapa.uso_llm) {
+        actualizarMonitorVivo("COMPLETADO_LLM", `✓ ${nombreEtapa} completada usando el modelo LLM '${resEtapa.modelo_ia}'.`, resEtapa.modelo_ia);
+      } else {
+        actualizarMonitorVivo("COMPLETADO_DET", `✓ ${nombreEtapa} completada con reglas exactas (${resEtapa?.modelo_ia || 'rules_engine.py'}).`);
+      }
+
       banner.textContent = `✓ ${nombreEtapa} completada`;
+      banner.className = "text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 font-semibold";
+      return statusActual;
     }
 
-    async function ejecutarFlujoCompleto() {
-      await ejecutarEtapa("/api/proceso/ejecutar-todo", "Flujo Completo PAR.01 (Etapas 1 a 12)");
+    async function ejecutarFlujoCompletoPasoAPaso() {
+      const btn = document.getElementById("btn-ejecutar-todo");
+      btn.disabled = true;
+      btn.classList.add("opacity-70");
+
+      const secuencia = [
+        { codigo: "ETAPA_1", url: "/api/proceso/auditar-soportes", nombre: "Etapa 1: Visión Multimodal IA", motor: "CON_LLM" },
+        { codigo: "PASO_4", url: "/api/proceso/paso4-icfes", nombre: "Paso 4: Cruce Oficial ICFES + Notificación", motor: "HIBRIDO" },
+        { codigo: "PASO_5", url: "/api/proceso/paso5-requisitos", nombre: "Paso 5: Filtro Puntaje >=31 y Vigencia", motor: "SIN_LLM" },
+        { codigo: "PASOS_6_7", url: "/api/proceso/pasos6-7-seleccion", nombre: "Pasos 6 y 7: Ponderación, 5 Desempates y P.F.U.", motor: "SIN_LLM" },
+        { codigo: "PASOS_8_12", url: "/api/proceso/paso12-cartas", nombre: "Pasos 8-12: Códigos UIS, Cartas y Acta", motor: "HIBRIDO" }
+      ];
+
+      try {
+        for (const paso of secuencia) {
+          await ejecutarEtapaIndividual(paso.codigo, paso.url, paso.nombre, paso.motor);
+        }
+        const banner = document.getElementById("status-banner");
+        banner.textContent = "✓ Flujo Completo PAR.01 (5/5 Etapas) finalizado exitosamente";
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove("opacity-70");
+      }
     }
 
     async function reiniciarEscenario() {
-      await ejecutarEtapa("/api/seed", "Reinicio de Escenario Semilla DARA");
+      const banner = document.getElementById("status-banner");
+      banner.textContent = "Reiniciando escenario semilla DARA...";
+      await fetch("/api/seed", { method: "POST" });
+      await cargarTodo();
+      actualizarMonitorVivo("COMPLETADO_DET", "Escenario reiniciado a estado inicial (12 aspirantes inscritos, 0 etapas ejecutadas).");
+      banner.textContent = "✓ Escenario Semilla DARA reiniciado";
     }
 
     async function verExpediente(aspiranteId) {
@@ -401,6 +1007,7 @@
 
       const soportesHtml = data.soportes.map(s => {
         const urlArchivo = "/" + s.ruta_archivo.replace(/^\/+/, "");
+        const auditadoConLLM = (s.observaciones_ia || "").includes("gemini") || !(s.observaciones_ia || "").includes("Pendiente");
         return `
           <div class="border border-slate-200 rounded-lg p-3 bg-slate-50 flex flex-col justify-between gap-2">
             <div>
@@ -413,22 +1020,34 @@
               <div class="text-[11px] text-slate-500 mt-0.5">${s.nombre_archivo} (${s.mime_type})</div>
               <div class="text-[11px] text-slate-700 mt-1">${s.observaciones_ia || 'Pendiente de auditoría multimodal'}</div>
             </div>
-            <div class="flex items-center gap-2 pt-2 border-t border-slate-200">
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-200">
               <a href="${urlArchivo}" target="_blank" class="text-emerald-700 hover:underline font-semibold text-[11px]">
-                👁️ Abrir soporte original (${s.mime_type.includes('pdf') ? 'PDF' : 'PNG'})
+                👁️ Abrir archivo (${s.mime_type.includes('pdf') ? 'PDF' : 'PNG'})
               </a>
+              <button onclick="auditarSoporteIndividualEnVivo(${s.id}, ${data.id})"
+                class="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold px-2 py-1 rounded transition">
+                🤖 Auditar con Gemini Vision
+              </button>
             </div>
           </div>
         `;
       }).join("");
 
-      const logsHtml = (data.logs_parseados || []).map(l => `
-        <div class="border-l-2 border-emerald-600 pl-2.5 py-1">
-          <span class="font-mono text-[10px] text-slate-400">${l.timestamp}</span>
-          <span class="font-bold text-emerald-800 ml-1">[${l.etapa}]</span>
-          <div class="text-slate-700">${l.detalle}</div>
-        </div>
-      `).join("");
+      const logsHtml = (data.logs_parseados || []).map(l => {
+        const esLLM = (l.detalle || "").includes("gemini") || (l.detalle || "").includes("LLM");
+        return `
+          <div class="border-l-2 ${esLLM ? 'border-indigo-600 bg-indigo-50/40' : 'border-emerald-600'} pl-2.5 py-1 rounded-r">
+            <div class="flex items-center gap-2">
+              <span class="font-mono text-[10px] text-slate-400">${l.timestamp}</span>
+              <span class="font-bold ${esLLM ? 'text-indigo-800' : 'text-emerald-800'}">[${l.etapa}]</span>
+              <span class="text-[10px] px-1.5 py-0.2 rounded font-bold ${esLLM ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-700'}">
+                ${esLLM ? '🤖 Con LLM' : '⚙️ Determinista'}
+              </span>
+            </div>
+            <div class="text-slate-700 mt-0.5">${l.detalle}</div>
+          </div>
+        `;
+      }).join("");
 
       document.getElementById("modal-exp-contenido").innerHTML = `
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-lg border border-slate-200">
@@ -493,7 +1112,7 @@
         ` : ''}
 
         <div>
-          <h4 class="font-bold text-slate-700 uppercase text-[11px] mb-1.5">Bitácora de Trazabilidad y Auditoría</h4>
+          <h4 class="font-bold text-slate-700 uppercase text-[11px] mb-1.5">Bitácora de Trazabilidad y Auditoría (Con indicador LLM vs Determinista)</h4>
           <div class="space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-200">${logsHtml}</div>
         </div>
       `;
@@ -503,10 +1122,21 @@
       modal.classList.add("flex");
     }
 
+    async function auditarSoporteIndividualEnVivo(soporteId, aspiranteId) {
+      actualizarMonitorVivo("EJECUTANDO_LLM", `Auditando soporte #${soporteId} en vivo con Gemini Vision...`);
+      const res = await fetch(`/api/soportes/${soporteId}/auditar`, { method: "POST" }).then(r => r.json());
+      await verExpediente(aspiranteId);
+      await cargarTodo();
+      if (res.uso_llm) {
+        actualizarMonitorVivo("COMPLETADO_LLM", `Soporte '${res.nombre_archivo}' auditado en vivo con ${res.modelo_ia || res.modo_ia} (${res.latencia_ms} ms).`, res.modo_ia);
+      }
+    }
+
     async function subirSoporte(event, aspiranteId) {
       event.preventDefault();
       const form = event.target;
       const formData = new FormData(form);
+      actualizarMonitorVivo("EJECUTANDO_LLM", "Subiendo soporte y ejecutando extracción multimodal con Gemini Vision...");
       const r = await fetch(`/api/aspirantes/${aspiranteId}/soportes`, {
         method: "POST",
         body: formData
@@ -524,17 +1154,100 @@
     }
 
     async function abrirModalActa() {
+      actualizarMonitorVivo("EJECUTANDO_HIBRIDO", "Generando Informe Técnico para Comité de Admisiones y Proyecto de Acta (Consolidado Determinista + Dictamen LLM)...");
       const data = await fetch("/api/proceso/acta-comite").then(r => r.json());
       document.getElementById("modal-acta-texto").textContent = data.informe_y_acta_texto;
       const modal = document.getElementById("modal-acta");
       modal.classList.remove("hidden");
       modal.classList.add("flex");
+      await cargarStatusYProgramas();
     }
 
     function cerrarModalActa() {
       const modal = document.getElementById("modal-acta");
       modal.classList.add("hidden");
       modal.classList.remove("flex");
+    }
+
+    async function abrirModalConfigIA() {
+      const modal = document.getElementById("modal-config-ia");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      const tel = await fetch("/api/config/gemini").then(r => r.json());
+      mostrarEstadoEnModalConfig(tel);
+    }
+
+    function mostrarEstadoEnModalConfig(tel) {
+      const box = document.getElementById("config-ia-status-box");
+      if (tel.gemini_configurado) {
+        box.className = "p-3 rounded-lg border bg-emerald-50 border-emerald-200 text-emerald-950";
+        box.innerHTML = `
+          <div class="font-bold text-emerald-800">🟢 GEMINI_API_KEY Detectada en el Servidor (${tel.api_key_enmascarada})</div>
+          <div class="mt-1 text-[11px]">Modelo preferido: <code class="font-mono font-bold">${tel.modelo_preferido}</code> | Último modelo verificado: <code class="font-mono font-bold">${tel.ultimo_modelo_exitoso || 'Pendiente de llamada'}</code></div>
+          ${tel.ultimo_error_gemini ? `<div class="mt-1 text-rose-700 font-mono text-[10px]">Último aviso API: ${tel.ultimo_error_gemini}</div>` : ''}
+        `;
+      } else {
+        box.className = "p-3 rounded-lg border bg-amber-50 border-amber-300 text-amber-950";
+        box.innerHTML = `
+          <div class="font-bold text-amber-900">⚠️ No se detectó GEMINI_API_KEY en el proceso actual del servidor</div>
+          <div class="mt-1 text-[11px]">Si exportaste la variable en otra terminal distinta a donde corre <code class="font-mono">uvicorn</code>, pégala aquí abajo para guardarla en <code class="font-mono">.env</code> y activarla de inmediato en vivo.</div>
+        `;
+      }
+    }
+
+    function cerrarModalConfigIA() {
+      const modal = document.getElementById("modal-config-ia");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
+
+    async function guardarConfigGemini(event) {
+      event.preventDefault();
+      const apiKey = document.getElementById("input-gemini-key").value.trim();
+      const modelo = document.getElementById("input-gemini-model").value;
+      const testBox = document.getElementById("config-ia-test-result");
+      testBox.classList.remove("hidden");
+      testBox.className = "p-3 rounded-lg border bg-slate-100 border-slate-300 text-slate-700 text-xs font-mono";
+      testBox.textContent = "Guardando configuración y verificando conexión en vivo con Google Gemini...";
+
+      const payload = { modelo, persistir_env: true };
+      if (apiKey) payload.api_key = apiKey;
+
+      const res = await fetch("/api/config/gemini", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(r => r.json());
+
+      document.getElementById("input-gemini-key").value = "";
+      mostrarEstadoEnModalConfig(res.telemetria);
+      if (res.prueba_conexion) {
+        mostrarResultadoPruebaGemini(res.prueba_conexion);
+      }
+      await cargarTodo();
+    }
+
+    async function probarConexionGeminiEnVivo() {
+      const testBox = document.getElementById("config-ia-test-result");
+      testBox.classList.remove("hidden");
+      testBox.className = "p-3 rounded-lg border bg-indigo-50 border-indigo-200 text-indigo-900 text-xs font-mono";
+      testBox.textContent = "📡 Enviando prompt de prueba en vivo a Google Gemini API...";
+
+      const res = await fetch("/api/config/gemini/probar", { method: "POST" }).then(r => r.json());
+      mostrarResultadoPruebaGemini(res);
+      await cargarTodo();
+    }
+
+    function mostrarResultadoPruebaGemini(prueba) {
+      const testBox = document.getElementById("config-ia-test-result");
+      testBox.classList.remove("hidden");
+      if (prueba.conectado) {
+        testBox.className = "p-3 rounded-lg border bg-emerald-950 border-emerald-700 text-emerald-100 text-xs font-mono whitespace-pre-wrap";
+        testBox.textContent = `✅ CONEXIÓN EN VIVO EXITOSA\nModelo activo: ${prueba.modelo_verificado}\nLatencia: ${prueba.latencia_ms} ms\nRespuesta del LLM: "${prueba.mensaje}"`;
+      } else {
+        testBox.className = "p-3 rounded-lg border bg-rose-950 border-rose-700 text-rose-100 text-xs font-mono whitespace-pre-wrap";
+        testBox.textContent = `❌ NO SE PUDO CONECTAR AL LLM\nMensaje: ${prueba.mensaje}\nDetalle: ${prueba.error || 'Verifica tu GEMINI_API_KEY'}`;
+      }
     }
 
     function enviarPreguntaRapida(texto) {
@@ -551,12 +1264,23 @@
 
       const cont = document.getElementById("chat-mensajes");
       cont.innerHTML += `
-        <div class="bg-emerald-700 text-white rounded-lg p-3 ml-6">
+        <div class="bg-emerald-700 text-white rounded-lg p-3 ml-6 shadow-sm">
           <div class="font-bold text-[10px] text-emerald-200 mb-0.5">Coordinador DARA</div>
           <div>${mensaje}</div>
         </div>
       `;
+
+      const tempId = "msg-loading-" + Date.now();
+      cont.innerHTML += `
+        <div id="${tempId}" class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 mr-4 text-indigo-900 animate-pulse">
+          <div class="font-bold text-[11px] flex items-center gap-1.5">
+            <span>🤖 Procesando en Copiloto DARA (Invocando LLM + Herramientas Deterministas)...</span>
+          </div>
+        </div>
+      `;
       cont.scrollTop = cont.scrollHeight;
+
+      actualizarMonitorVivo("EJECUTANDO_LLM", `Copiloto DARA procesando consulta: "${mensaje.slice(0, 50)}..."`);
 
       const res = await fetch("/api/copilot/chat", {
         method: "POST",
@@ -564,21 +1288,35 @@
         body: JSON.stringify({ mensaje })
       }).then(r => r.json());
 
+      const loadingEl = document.getElementById(tempId);
+      if (loadingEl) loadingEl.remove();
+
       const toolsBadges = (res.herramientas_invocadas || []).map(
-        t => `<span class="inline-block bg-emerald-900 text-emerald-100 font-mono text-[10px] px-1.5 py-0.5 rounded mr-1">🔧 ${t}()</span>`
+        t => `<span class="inline-block bg-emerald-900 text-emerald-100 font-mono text-[10px] px-1.5 py-0.5 rounded mr-1">🔧 ${t}() [Determinista]</span>`
       ).join("");
 
+      const badgeMotorMsg = res.uso_llm
+        ? `<span class="bg-indigo-100 text-indigo-800 border border-indigo-300 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">🤖 LLM: ${res.modo_ia} (${res.latencia_ms || 0} ms)</span>`
+        : `<span class="bg-slate-200 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold">⚙️ Respaldo Determinista (Sin LLM)</span>`;
+
       cont.innerHTML += `
-        <div class="bg-slate-100 border border-slate-200 rounded-lg p-3 mr-4 text-slate-800">
-          <div class="flex items-center justify-between mb-1">
-            <span class="font-bold text-emerald-800">Copiloto DARA</span>
-            <span class="text-[10px] text-slate-400 font-mono">${res.modo_ia}</span>
+        <div class="bg-slate-100 border border-slate-200 rounded-lg p-3 mr-4 text-slate-800 shadow-sm">
+          <div class="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+            <span class="font-bold text-emerald-900">Copiloto DARA</span>
+            ${badgeMotorMsg}
           </div>
           ${toolsBadges ? `<div class="mb-2">${toolsBadges}</div>` : ''}
           <div class="whitespace-pre-wrap leading-relaxed">${res.respuesta}</div>
         </div>
       `;
       cont.scrollTop = cont.scrollHeight;
+
+      if (res.uso_llm) {
+        actualizarMonitorVivo("COMPLETADO_LLM", `Copiloto DARA respondió en vivo con ${res.modo_ia} (${res.latencia_ms} ms).`, res.modo_ia);
+      } else {
+        actualizarMonitorVivo("COMPLETADO_DET", "Copiloto DARA respondió mediante el orquestador determinista.");
+      }
+
       await cargarTodo();
     }
 

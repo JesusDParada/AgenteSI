@@ -179,4 +179,12 @@ class CopilotChatResponse(BaseModel):
     respuesta: str
     herramientas_invocadas: List[str] = []
     modo_ia: str = "deterministic_fallback"
+    uso_llm: bool = False
+    latencia_ms: int = 0
     datos_contexto: Optional[Dict[str, Any]] = None
+
+
+class GeminiConfigRequest(BaseModel):
+    api_key: Optional[str] = None
+    modelo: Optional[str] = None
+    persistir_env: bool = True

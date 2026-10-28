@@ -175,3 +175,42 @@ def test_end_to_end_flujo_completo_ejecutar_todo_y_casos_borde(client):
     # 12. David (1098700012): No admitido por agotamiento de cupos en Medicina
     assert aspirantes["1098700012"]["estado_proceso"] == "NO_ADMITIDO"
 
+
+def test_api_pipeline_estado_por_etapas_y_telemetria_llm_vs_determinista(client):
+    """Verifica que /api/status reporte el estado de cada etapa del pipeline, sus resultados y qué procesos usan LLM vs Determinista."""
+    client.post("/api/seed")
+
+    st_ini = client.get("/api/status").json()
+    assert "pipeline" in st_ini
+    assert "telemetria_ia" in st_ini
+    assert st_ini["pipeline"]["etapas_completadas"] == 0
+    assert st_ini["pipeline"]["total_etapas"] == 5
+
+    etapas_ini = {e["codigo"]: e for e in st_ini["pipeline"]["etapas"]}
+    assert etapas_ini["ETAPA_1"]["naturaleza_motor"] == "CON_LLM"
+    assert etapas_ini["PASO_4"]["naturaleza_motor"] == "HIBRIDO"
+    assert etapas_ini["PASO_5"]["naturaleza_motor"] == "SIN_LLM"
+    assert etapas_ini["PASOS_6_7"]["naturaleza_motor"] == "SIN_LLM"
+    assert etapas_ini["PASOS_8_12"]["naturaleza_motor"] == "HIBRIDO"
+
+    # Ejecutar todo el flujo y verificar que las 5 etapas pasen a completadas con sus resultados
+    client.post("/api/proceso/ejecutar-todo")
+    st_fin = client.get("/api/status").json()
+    assert st_fin["pipeline"]["etapas_completadas"] == 5
+    assert st_fin["pipeline"]["porcentaje_avance"] == 100
+    assert st_fin["pipeline"]["flujo_completo"] is True
+
+    etapas_fin = {e["codigo"]: e for e in st_fin["pipeline"]["etapas"]}
+    assert etapas_fin["ETAPA_1"]["completada"] is True
+    assert "29/29" in etapas_fin["ETAPA_1"]["resultado_titulo"]
+    assert etapas_fin["PASO_4"]["estado"] == "COMPLETADO_CON_ALERTA"
+    assert "11 verificados" in etapas_fin["PASO_4"]["resultado_titulo"]
+    assert etapas_fin["PASO_5"]["completada"] is True
+    assert "9 habilitados" in etapas_fin["PASO_5"]["resultado_titulo"]
+    assert etapas_fin["PASOS_6_7"]["completada"] is True
+    assert "7 admitidos" in etapas_fin["PASOS_6_7"]["resultado_titulo"]
+    assert etapas_fin["PASOS_8_12"]["completada"] is True
+    assert "7 códigos UIS" in etapas_fin["PASOS_8_12"]["resultado_titulo"]
+    assert st_fin["telemetria_ia"]["procesos_deterministas_ejecutados"] > 0
+
+

@@ -14,7 +14,7 @@ El reto arquitectónico principal en un sistema de selección universitaria asis
 **Goals:**
 - Arquitectura monolítica modular en **FastAPI** que sirva tanto la API REST como el frontend ligero (plantillas Jinja2 + TailwindCSS CDN + JavaScript/Fetch) y persista todo el estado en **SQLite**.
 - Separación estricta entre el **Sub-agente de Visión Documental** (extracción multimodal tipada con esquemas Pydantic), el **Motor Determinista de Reglas PAR.01** (cálculos, ponderaciones, 5 reglas de desempate en cascada y cruce de P.F.U.) y el **Copiloto Conversacional DARA** (*Tool Calling*).
-- Modo de respaldo (*Fallback / Mock IA*) para que la aplicación y sus pruebas puedan ejecutarse y demostrarse incluso si en un entorno sin conexión o sin clave `GEMINI_API_KEY` se requiere simular la respuesta multimodal o del agente, manteniendo integración real con `google-genai` (`gemini-2.5-flash`) cuando la API key esté configurada.
+- Modo de respaldo (*Fallback / Mock IA*) para que la aplicación y sus pruebas puedan ejecutarse y demostrarse incluso si en un entorno sin conexión o sin clave `GEMINI_API_KEY` se requiere simular la respuesta multimodal o del agente, manteniendo integración real con `google-genai` (`gemini-3.5-flash-lite`) cuando la API key esté configurada.
 
 **Non-Goals:**
 - No se implementarán flujos de selección alternativos fuera del flujo principal presencial por Saber 11° (quedan fuera de alcance el cálculo por notas Pre-UIS de Sedes Regionales, la Fase 2 de aptitud musical de Licenciatura en Música, la excepción de programas virtuales/distancia y los sub-flujos jurídicos de Admisión Especial).
@@ -23,9 +23,9 @@ El reto arquitectónico principal en un sistema de selección universitaria asis
 
 ## Decisions
 
-### 1. Arquitectura Híbrida: Agente LLM/VLM (`gemini-2.5-flash`) + Motor Determinista en Python
-- **Decisión**: Usar el SDK oficial `google-genai` con el modelo `gemini-2.5-flash` para dos funciones: (a) extracción multimodal directa de bytes de archivos PDF/PNG/JPG usando `response_schema` (Pydantic) y (b) agente conversacional con declaración de herramientas Python (`tools=[...]`). Toda validación de umbrales (`>= 31`), vigencia (`<= 5 años` y `>= 2012`), cálculo de ponderados, desempates en cascada y corrimiento de cupos por P.F.U. se ejecuta en funciones puras de Python sobre SQLite.
-- **Racional**: `gemini-2.5-flash` procesa PDFs e imágenes de forma nativa sin requerir binarios del sistema operativo como Tesseract o Poppler, cuenta con capa gratuita en Google AI Studio y ofrece baja latencia para el chat copiloto. Delegar las matemáticas y el ordenamiento a Python garantiza cumplimiento 100% auditable del reglamento UIS.
+### 1. Arquitectura Híbrida: Agente LLM/VLM (`gemini-3.5-flash-lite`) + Motor Determinista en Python
+- **Decisión**: Usar el SDK oficial `google-genai` con el modelo `gemini-3.5-flash-lite` para dos funciones: (a) extracción multimodal directa de bytes de archivos PDF/PNG/JPG usando `response_schema` (Pydantic) y (b) agente conversacional con declaración de herramientas Python (`tools=[...]`). Toda validación de umbrales (`>= 31`), vigencia (`<= 5 años` y `>= 2012`), cálculo de ponderados, desempates en cascada y corrimiento de cupos por P.F.U. se ejecuta en funciones puras de Python sobre SQLite.
+- **Racional**: `gemini-3.5-flash-lite` procesa PDFs e imágenes de forma nativa sin requerir binarios del sistema operativo como Tesseract o Poppler, cuenta con capa gratuita en Google AI Studio y ofrece baja latencia para el chat copiloto. Delegar las matemáticas y el ordenamiento a Python garantiza cumplimiento 100% auditable del reglamento UIS.
 - **Alternativas consideradas**:
   - *OCR tradicional (Tesseract + PyMuPDF) + LLM de solo texto (Groq/Llama)*: Descartado porque obliga a instalar paquetes nativos en Linux/Windows y el OCR falla frecuentemente con tablas de puntajes del ICFES o certificados electorales fotografiados.
   - *Dejar que el LLM ordene y asigne cupos mediante prompt*: Descartado por riesgo de errores de redondeo, incumplimiento del orden estricto de las 5 reglas de desempate y falta de reproducibilidad.
@@ -83,7 +83,7 @@ El reto arquitectónico principal en un sistema de selección universitaria asis
 
 ## Risks / Trade-offs
 
-- **[Ausencia o límite de cuota de `GEMINI_API_KEY` durante pruebas o sustentación]** → Mitigación: Implementar en `ai_agent.py` un modo híbrido que use `gemini-2.5-flash` cuando `GEMINI_API_KEY` esté configurada en el entorno (o en la UI) y cuente con un extractor/respondedor de respaldo basado en los metadatos e inspección local de los soportes de prueba, de modo que la demostración nunca se bloquee.
+- **[Ausencia o límite de cuota de `GEMINI_API_KEY` durante pruebas o sustentación]** → Mitigación: Implementar en `ai_agent.py` un modo híbrido que use `gemini-3.5-flash-lite` cuando `GEMINI_API_KEY` esté configurada en el entorno (o en la UI) y cuente con un extractor/respondedor de respaldo basado en los metadatos e inspección local de los soportes de prueba, de modo que la demostración nunca se bloquee.
 - **[Formatos variados de archivos PDF e imagen cargados por el usuario]** → Mitigación: Validar MIME types permitidos (`application/pdf`, `image/png`, `image/jpeg`, `image/webp`) al subir el archivo y generar automáticamente en `seed_data.py` documentos PDF/PNG reales de ejemplo (certificados Saber 11°, diplomas y certificados electorales) para probar el flujo multimodal desde el primer arranque.
 - **[Trazabilidad de por qué un aspirante ganó o perdió un desempate o corrimiento de cupo]** → Mitigación: Guardar en el campo `log_auditoria` / `causal_decision` de cada aspirante el detalle exacto del cálculo (puntaje ponderado, criterio de desempate aplicado o antecedente histórico detectado) para que tanto la tabla del dashboard como el Chat Copiloto respondan con precisión.
 
