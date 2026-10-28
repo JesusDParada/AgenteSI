@@ -1,0 +1,79 @@
+sequenceDiagram
+    autonumber
+    actor Coord as Coordinador DARA / Usuario
+    participant API as FastAPI (app/main.py)
+    participant Seed as Ingesta & Semilla (seed_data.py)
+    participant Agent as Agente IA & Orquestador (ai_agent.py)
+    participant Gemini as Google Gemini API (Vision & Tool Calling)
+    participant Rules as Motor Determinista (rules_engine.py)
+    participant DB as SQLite (dara_admisiones.db)
+
+    rect rgb(241, 245, 249)
+        Note over Coord,DB: FASE 0 · Carga de Oferta Académica, Inscripción, Tarifas SISBÉN y Soportes (Pasos 1-3 y Sección 6)
+        Coord->>API: POST /api/seed (o inicio de aplicación)
+        API->>Seed: poblar_escenario_semilla(db)
+        Seed->>Rules: liquidar_derechos_inscripcion(grupo_sisben, num_opciones)
+        Rules-->>Seed: Tarifa exacta en SMLMV (Grupo A, B, C1-C9, C10-C18/Otros)
+        Seed->>Seed: leer_datos_aspirantes_xlsx(DatosAspirantes.xlsx)
+        Seed->>DB: Inserta 6 Programas, 32 Aspirantes, 69 Soportes (PDF/PNG/JPG), MockIcfesOficial y MockHistoricoUis
+    end
+
+    rect rgb(238, 242, 255)
+        Note over Coord,DB: ETAPA 1 · Auditoría Documental Multimodal IA (Saber 11° PDF, Diploma JPG/PNG, Electoral PNG)
+        Coord->>API: POST /api/proceso/auditar-soportes (o /ejecutar-todo)
+        API->>Agent: auditar_todos_los_soportes(db)
+        loop Para cada SoporteDocumental (69 archivos)
+            alt GEMINI_API_KEY activa (Modo Multimodal en Vivo)
+                Agent->>Gemini: generate_content(bytes PDF/Imagen + response_schema Pydantic)
+                Gemini-->>Agent: JSON estructurado (ExtraccionIcfesSchema / Diploma / Electoral)
+            else Sin clave o Respaldo Determinista Local
+                Agent->>Seed: extraer_datos_pdf_icfes_real(ruta_pdf) via pdftotext + Regex
+                Seed-->>Agent: SNP, Documento, Nombre, Global y 5 puntajes por área
+            end
+            Agent->>Agent: Valida coherencia SNP y Documento (Ej: detecta alerta en #01 Juanita Romero)
+            Agent->>DB: Actualiza SoporteDocumental (es_valido, observaciones_ia) y banderas del Aspirante
+        end
+    end
+
+    rect rgb(239, 246, 255)
+        Note over Coord,DB: PASO 4 · Cruce Masivo con el ICFES y Notificación de Inconsistencias (Híbrido)
+        Coord->>API: POST /api/proceso/paso4-icfes
+        API->>Agent: ejecutar_paso4_verificacion_icfes(db)
+        loop Para cada Aspirante inscrito (32 aspirantes)
+            Agent->>DB: Consulta MockIcfesOficial por registro_snp + revisa validez de soporte ICFES
+            alt Coincidencia Exacta (30 aspirantes)
+                Agent->>DB: Estado = VERIFICADO_ICFES (copia los 6 puntajes oficiales)
+            else Discrepancia en Puntajes, SNP o Soporte Ajeno (2 aspirantes: #08 Andrés y #13 Juanita)
+                Agent->>Gemini: Redacta dictamen técnico-jurídico de requerimiento formal (si hay API Key)
+                Agent->>DB: Estado = INCONSISTENCIA_ICFES + guarda correo a admisiones@uis.edu.co
+            end
+        end
+    end
+
+    rect rgb(236, 253, 245)
+        Note over Coord,DB: PASO 5 · Filtro Eliminatorio de Puntaje Mínimo (>= 31) y Vigencia (<= 5 años) (100% Determinista)
+        Coord->>API: POST /api/proceso/paso5-requisitos
+        API->>Rules: ejecutar_paso5_validacion_puntajes_minimos(db, anio_convocatoria=2026)
+        Rules->>DB: Verifica nivel_educativo_valido, vigencia (2021-2026) y 5 áreas >= 31.0 pts
+        Rules-->>API: 28 HABILITADOS | 1 ANULADO_PUNTAJE_MINIMO (#06) | 1 ANULADO_VIGENCIA_EXAMEN (#07)
+    end
+
+    rect rgb(220, 252, 231)
+        Note over Coord,DB: PASOS 6 Y 7 · Mérito Exacto, 5 Reglas de Desempate, Cruce P.F.U. y 1ra/2da Opción (100% Determinista)
+        Coord->>API: POST /api/proceso/pasos6-7-seleccion
+        API->>Rules: ejecutar_pasos_6_y_7_seleccion_y_cruce_historico(db)
+        Rules->>Rules: Calcula puntaje_ponderado_op1 y op2 a 4 decimales según pesos de Facultad
+        Rules->>Rules: Ordena por Ponderado y aplica 5 Reglas de Desempate (Global, LC, SC, Voto>=18, Turno)
+        Rules->>DB: Cruza candidatos contra MockHistoricoUis (Inhabilita #02 por P.F.U. y corre cupo a #04)
+        Rules->>DB: Asigna cupos 1ra Opción (16 admitidos) y cupos remanentes 2da Opción (6 admitidos)
+    end
+
+    rect rgb(254, 252, 232)
+        Note over Coord,DB: PASOS 8 AL 13 · Informe Comité, Acta Consejo Académico, Códigos UIS y Cartas (Híbrido)
+        Coord->>API: POST /api/proceso/paso12-cartas & GET /api/proceso/acta-comite
+        API->>Agent: ejecutar_paso12_con_ia(db) & generar_informe_y_acta_comite(db)
+        Agent->>Rules: ejecutar_paso12_hoja_vida_y_cartas_admision(db)
+        Rules->>DB: Asigna código único UIS (2262001..2262022), hoja de vida y carta oficial
+        Agent->>Gemini: Enriquece Cartas de Admisión y redacta Dictamen Ejecutivo para Consejo Académico
+        Agent-->>Coord: Expedientes completos, Cartas de Admisión y Proyecto de Acta listos para Matrícula (Paso 13)
+    end

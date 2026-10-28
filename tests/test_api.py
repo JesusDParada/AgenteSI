@@ -46,18 +46,20 @@ def test_api_seed_programas_y_aspirantes(client):
     r_seed = client.post("/api/seed")
     assert r_seed.status_code == 200
     data_seed = r_seed.json()
-    assert data_seed["detalle"]["programas_creados"] == 4
-    assert data_seed["detalle"]["aspirantes_creados"] == 12
+    assert data_seed["detalle"]["programas_creados"] == 6
+    assert data_seed["detalle"]["aspirantes_creados"] == 32
+    assert data_seed["detalle"]["aspirantes_base"] == 12
+    assert data_seed["detalle"]["aspirantes_simpledocs"] == 20
 
     r_prog = client.get("/api/programas")
     assert r_prog.status_code == 200
     programas = r_prog.json()
-    assert len(programas) == 4
+    assert len(programas) == 6
 
     r_asp = client.get("/api/aspirantes")
     assert r_asp.status_code == 200
     aspirantes = r_asp.json()
-    assert len(aspirantes) == 12
+    assert len(aspirantes) == 32
 
 
 def test_api_carga_soporte_pdf_y_flujo_por_etapas_par01(client):
@@ -79,22 +81,22 @@ def test_api_carga_soporte_pdf_y_flujo_por_etapas_par01(client):
     # 2. Ejecutar Paso 4 (Verificación ICFES)
     r_p4 = client.post("/api/proceso/paso4-icfes")
     assert r_p4.status_code == 200
-    assert r_p4.json()["verificados_icfes"] == 11
-    assert r_p4.json()["inconsistencias_detectadas"] == 1
+    assert r_p4.json()["verificados_icfes"] == 30
+    assert r_p4.json()["inconsistencias_detectadas"] == 2
 
     # 3. Ejecutar Paso 5 (Puntaje mínimo >=31 y vigencia <=5 años)
     r_p5 = client.post("/api/proceso/paso5-requisitos")
     assert r_p5.status_code == 200
-    assert r_p5.json()["habilitados"] == 9
+    assert r_p5.json()["habilitados"] == 28
     assert r_p5.json()["anulados_puntaje_minimo"] == 1
     assert r_p5.json()["anulados_vigencia_examen"] == 1
 
     # 4. Ejecutar Pasos 6 y 7 (Ponderación, 5 desempates y cruce histórico P.F.U.)
     r_p67 = client.post("/api/proceso/pasos6-7-seleccion")
     assert r_p67.status_code == 200
-    assert r_p67.json()["total_admitidos"] == 7
+    assert r_p67.json()["total_admitidos"] == 22
     assert r_p67.json()["inhabilitados_historico_uis"] == 1
-    assert r_p67.json()["no_admitidos"] == 1
+    assert r_p67.json()["no_admitidos"] == 5
 
     # 5. Consultar listados y acta para el Comité de Admisiones y Consejo Académico (Pasos 8-10)
     r_acta = client.get("/api/proceso/acta-comite")
@@ -104,7 +106,7 @@ def test_api_carga_soporte_pdf_y_flujo_por_etapas_par01(client):
     # 6. Ejecutar Paso 12 (Códigos de estudiante UIS, hojas de vida y cartas de admisión)
     r_p12 = client.post("/api/proceso/paso12-cartas")
     assert r_p12.status_code == 200
-    assert r_p12.json()["total_cartas_expedidas"] == 7
+    assert r_p12.json()["total_cartas_expedidas"] == 22
 
     # Consultar carta de admisión del primer aspirante
     r_carta = client.get(f"/api/aspirantes/{primer_asp_id}/carta")
@@ -123,21 +125,23 @@ def test_api_carga_soporte_pdf_y_flujo_por_etapas_par01(client):
 
 
 def test_end_to_end_flujo_completo_ejecutar_todo_y_casos_borde(client):
-    """Valida de extremo a extremo el endpoint /api/proceso/ejecutar-todo y verifica todos los casos borde del lote semilla."""
+    """Valida de extremo a extremo el endpoint /api/proceso/ejecutar-todo y verifica todos los casos borde del lote semilla y simpledocs."""
     client.post("/api/seed")
 
     r_todo = client.post("/api/proceso/ejecutar-todo")
     assert r_todo.status_code == 200
     res = r_todo.json()
 
-    assert res["auditoria_soportes"]["total_soportes_auditados"] == 29
-    assert res["paso_4_icfes"]["verificados_icfes"] == 11
-    assert res["paso_4_icfes"]["inconsistencias_detectadas"] == 1
-    assert res["paso_5_requisitos_minimos"]["habilitados"] == 9
-    assert res["pasos_6_y_7_seleccion"]["total_admitidos"] == 7
-    assert res["pasos_6_y_7_seleccion"]["admitidos_primera_opcion"] == 6
-    assert res["pasos_6_y_7_seleccion"]["admitidos_segunda_opcion"] == 1
-    assert res["paso_12_cartas_admision"]["total_cartas_expedidas"] == 7
+    assert res["auditoria_soportes"]["total_soportes_auditados"] == 69
+    assert res["auditoria_soportes"]["soportes_validos"] == 68
+    assert res["auditoria_soportes"]["soportes_con_observacion"] == 1
+    assert res["paso_4_icfes"]["verificados_icfes"] == 30
+    assert res["paso_4_icfes"]["inconsistencias_detectadas"] == 2
+    assert res["paso_5_requisitos_minimos"]["habilitados"] == 28
+    assert res["pasos_6_y_7_seleccion"]["total_admitidos"] == 22
+    assert res["pasos_6_y_7_seleccion"]["admitidos_primera_opcion"] == 16
+    assert res["pasos_6_y_7_seleccion"]["admitidos_segunda_opcion"] == 6
+    assert res["paso_12_cartas_admision"]["total_cartas_expedidas"] == 22
 
     aspirantes = {a["documento_identidad"]: a for a in client.get("/api/aspirantes").json()}
 
@@ -175,6 +179,23 @@ def test_end_to_end_flujo_completo_ejecutar_todo_y_casos_borde(client):
     # 12. David (1098700012): No admitido por agotamiento de cupos en Medicina
     assert aspirantes["1098700012"]["estado_proceso"] == "NO_ADMITIDO"
 
+    # 13. Simpledocs #01 - Juanita Romero Caicedo (1034520673):
+    # Declaró SNP AC202630601849 pero adjuntó '1 AC202637178411.pdf' perteneciente a Mariana Tovar Quintero
+    juanita = aspirantes["1034520673"]
+    assert juanita["estado_proceso"] == "INCONSISTENCIA_ICFES"
+    assert "Mariana Tovar Quintero" in juanita["causal_decision"]
+    soporte_icfes_juanita = next(s for s in juanita["soportes"] if s["tipo_documento"] == "ICFES")
+    assert soporte_icfes_juanita["es_valido"] is False
+    assert "1 AC202637178411.pdf" in soporte_icfes_juanita["nombre_archivo"]
+
+    # 14. Simpledocs #12 - Matias Luengas Vergel (1092945665): Puntaje perfecto 500/500 -> Admitido en 1ra opción (ING-IND)
+    matias = aspirantes["1092945665"]
+    assert matias["estado_proceso"] == "ADMITIDO"
+    assert matias["opcion_admitida"] == 1
+    assert matias["puntaje_global"] == 500.0
+    assert len(matias["soportes"]) == 2
+    assert all(s["es_valido"] for s in matias["soportes"])
+
 
 def test_api_pipeline_estado_por_etapas_y_telemetria_llm_vs_determinista(client):
     """Verifica que /api/status reporte el estado de cada etapa del pipeline, sus resultados y qué procesos usan LLM vs Determinista."""
@@ -202,15 +223,15 @@ def test_api_pipeline_estado_por_etapas_y_telemetria_llm_vs_determinista(client)
 
     etapas_fin = {e["codigo"]: e for e in st_fin["pipeline"]["etapas"]}
     assert etapas_fin["ETAPA_1"]["completada"] is True
-    assert "29/29" in etapas_fin["ETAPA_1"]["resultado_titulo"]
+    assert "69/69" in etapas_fin["ETAPA_1"]["resultado_titulo"]
     assert etapas_fin["PASO_4"]["estado"] == "COMPLETADO_CON_ALERTA"
-    assert "11 verificados" in etapas_fin["PASO_4"]["resultado_titulo"]
+    assert "30 verificados" in etapas_fin["PASO_4"]["resultado_titulo"]
     assert etapas_fin["PASO_5"]["completada"] is True
-    assert "9 habilitados" in etapas_fin["PASO_5"]["resultado_titulo"]
+    assert "28 habilitados" in etapas_fin["PASO_5"]["resultado_titulo"]
     assert etapas_fin["PASOS_6_7"]["completada"] is True
-    assert "7 admitidos" in etapas_fin["PASOS_6_7"]["resultado_titulo"]
+    assert "22 admitidos" in etapas_fin["PASOS_6_7"]["resultado_titulo"]
     assert etapas_fin["PASOS_8_12"]["completada"] is True
-    assert "7 códigos UIS" in etapas_fin["PASOS_8_12"]["resultado_titulo"]
+    assert "22 códigos UIS" in etapas_fin["PASOS_8_12"]["resultado_titulo"]
     assert st_fin["telemetria_ia"]["procesos_deterministas_ejecutados"] > 0
 
 

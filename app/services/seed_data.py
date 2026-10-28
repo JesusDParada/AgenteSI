@@ -1,7 +1,12 @@
-"""Generador de datos semilla y soportes documentales reales en PDF e imagen (PNG) para demostración DARA."""
+"""Generador de datos semilla y soportes documentales reales en PDF e imagen (PNG/JPG) para demostración DARA."""
 
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
+import re
+import subprocess
+from typing import Any, Dict, List, Optional
+import xml.etree.ElementTree as ET
+import zipfile
 from PIL import Image, ImageDraw
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
@@ -17,6 +22,147 @@ from app.models import (
 from app.services.rules_engine import liquidar_derechos_inscripcion
 
 SEED_DOCS_DIR = Path("seed_docs")
+SIMPLEDOCS_DIR = SEED_DOCS_DIR / "simpledocs"
+
+
+def extraer_datos_pdf_icfes_real(ruta_pdf: Path) -> Optional[Dict[str, Any]]:
+    """Extrae texto real desde un reporte PDF del Examen Saber 11° (simpledocs o generado) usando pdftotext."""
+    if not ruta_pdf.exists() or not ruta_pdf.is_file():
+        return None
+    try:
+        res = subprocess.run(
+            ["pdftotext", str(ruta_pdf), "-"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        txt = res.stdout or ""
+    except Exception:
+        return None
+
+    if not txt.strip():
+        return None
+
+    # Caso 1: Reporte oficial Saber 11° en formato ICFES (seed_docs/simpledocs/*.pdf)
+    snp_m = re.search(r"\b(AC\d{10,14})\b", txt)
+    doc_m = re.search(r"(?:T\.I\.|C\.C\.)\s*(\d+)", txt)
+    glob_m = re.search(r"(\d{1,3})\s*/\s*500", txt)
+    scores_100 = [float(x) for x in re.findall(r"\b(\d{1,3})\s*/\s*100\b", txt)]
+
+    if snp_m and doc_m and glob_m and len(scores_100) >= 5:
+        lines = [line.strip() for line in txt.splitlines() if line.strip()]
+        nombre = ""
+        for idx, line in enumerate(lines):
+            if re.match(r"^(?:T\.I\.|C\.C\.)\s*\d+$", line) and idx > 0:
+                nombre = lines[idx - 1]
+                break
+        fec_m = re.search(r"(\d{2})/(\d{2})/(20\d{2})", txt)
+        anio = int(fec_m.group(3)) if fec_m else 2026
+        fecha_pres = (
+            f"{fec_m.group(3)}-{fec_m.group(2)}-{fec_m.group(1)}"
+            if fec_m
+            else f"{anio}-01-25"
+        )
+        return {
+            "registro_snp": snp_m.group(1),
+            "documento_identidad": doc_m.group(1),
+            "nombres_completos": nombre or "Evaluado Saber 11",
+            "anio_examen": anio,
+            "fecha_presentacion": fecha_pres,
+            "puntaje_global": float(glob_m.group(1)),
+            "lectura_critica": scores_100[0],
+            "matematicas": scores_100[1],
+            "sociales_ciudadanas": scores_100[2],
+            "ciencias_naturales": scores_100[3],
+            "ingles": scores_100[4],
+        }
+
+    return None
+
+
+def leer_datos_aspirantes_xlsx(ruta_xlsx: Path) -> List[Dict[str, Any]]:
+    """Lee las filas de DatosAspirantes.xlsx sin requerir dependencias externas usando zipfile y ElementTree."""
+    if not ruta_xlsx.exists() or not ruta_xlsx.is_file():
+        return []
+
+    ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    with zipfile.ZipFile(ruta_xlsx, "r") as zf:
+        shared: List[str] = []
+        if "xl/sharedStrings.xml" in zf.namelist():
+            root_ss = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+            for si in root_ss.findall("s:si", ns):
+                shared.append("".join((t.text or "") for t in si.findall(".//s:t", ns)))
+
+        root_sh = ET.fromstring(zf.read("xl/worksheets/sheet1.xml"))
+        filas_crudas: List[Dict[str, str]] = []
+        for row_el in root_sh.findall(".//s:sheetData/s:row", ns):
+            row_dict: Dict[str, str] = {}
+            for cell_el in row_el.findall("s:c", ns):
+                col_ref = "".join(ch for ch in cell_el.attrib.get("r", "") if ch.isalpha())
+                cell_type = cell_el.attrib.get("t", "")
+                val_el = cell_el.find("s:v", ns)
+                val_txt = val_el.text if val_el is not None and val_el.text is not None else ""
+                if cell_type == "s" and val_txt.isdigit():
+                    val_txt = shared[int(val_txt)]
+                row_dict[col_ref] = val_txt
+            filas_crudas.append(row_dict)
+
+    # Saltar fila de encabezado (índice 0) y filtrar filas vacías
+    registros: List[Dict[str, Any]] = []
+    for idx_fila, r in enumerate(filas_crudas[1:], start=1):
+        nombre_raw = (r.get("A") or "").strip().rstrip(".")
+        if not nombre_raw or not (r.get("D") or "").strip():
+            continue
+
+        partes_nombre = nombre_raw.split()
+        if len(partes_nombre) >= 4:
+            nombres = " ".join(partes_nombre[:-2])
+            apellidos = " ".join(partes_nombre[-2:])
+        elif len(partes_nombre) == 3:
+            nombres = partes_nombre[0]
+            apellidos = " ".join(partes_nombre[1:])
+        elif len(partes_nombre) == 2:
+            nombres, apellidos = partes_nombre[0], partes_nombre[1]
+        else:
+            nombres, apellidos = nombre_raw, "UIS"
+
+        tipo_doc_raw = (r.get("B") or "").lower()
+        tipo_doc = "TI" if "tarjeta" in tipo_doc_raw else "CC"
+        snp = (r.get("C") or "").strip()
+        documento = str(int(float(r["D"].strip())))
+
+        edad = 17
+        if (r.get("E") or "").strip():
+            try:
+                dias_excel = int(float(r["E"].strip()))
+                fecha_nac = datetime(1899, 12, 30) + timedelta(days=dias_excel)
+                edad = max(15, min(30, 2026 - fecha_nac.year))
+            except Exception:
+                edad = 17
+
+        registros.append(
+            {
+                "indice_simpledocs": idx_fila,
+                "nombre_completo": nombre_raw,
+                "nombres": nombres,
+                "apellidos": apellidos,
+                "tipo_documento": tipo_doc,
+                "documento_identidad": documento,
+                "registro_snp": snp,
+                "edad": edad,
+                "anio_examen": int(snp[2:6]) if len(snp) >= 6 and snp[2:6].isdigit() else 2026,
+                "puntaje_global": float(r.get("F") or 0.0),
+                "lectura_critica": float(r.get("G") or 0.0),
+                "matematicas": float(r.get("H") or 0.0),
+                "sociales_ciudadanas": float(r.get("I") or 0.0),
+                "ciencias_naturales": float(r.get("J") or 0.0),
+                "ingles": float(r.get("K") or 0.0),
+                "ciudad_residencia": (r.get("L") or "").strip(),
+            }
+        )
+
+    return registros
 
 
 def generar_pdf_reporte_icfes(
@@ -200,9 +346,49 @@ def poblar_escenario_semilla(
         peso_lectura_critica=10.0,
         peso_ingles=10.0,
     )
-    db.add_all([prog_sistemas, prog_medicina, prog_derecho, prog_matematicas])
+    prog_industrial = ProgramaAcademico(
+        codigo="ING-IND",
+        nombre="Ingeniería Industrial",
+        facultad="Facultad de Ingenierías Físico-Mecánicas",
+        modalidad="PRESENCIAL",
+        cupos_ofertados=10,
+        peso_ciencias_naturales=20.0,
+        peso_sociales_ciudadanas=10.0,
+        peso_matematicas=35.0,
+        peso_lectura_critica=20.0,
+        peso_ingles=15.0,
+    )
+    prog_civil = ProgramaAcademico(
+        codigo="ING-CIV",
+        nombre="Ingeniería Civil",
+        facultad="Facultad de Ingenierías Físico-Mecánicas",
+        modalidad="PRESENCIAL",
+        cupos_ofertados=5,
+        peso_ciencias_naturales=25.0,
+        peso_sociales_ciudadanas=10.0,
+        peso_matematicas=35.0,
+        peso_lectura_critica=15.0,
+        peso_ingles=15.0,
+    )
+    db.add_all(
+        [
+            prog_sistemas,
+            prog_medicina,
+            prog_derecho,
+            prog_matematicas,
+            prog_industrial,
+            prog_civil,
+        ]
+    )
     db.commit()
-    for p in (prog_sistemas, prog_medicina, prog_derecho, prog_matematicas):
+    for p in (
+        prog_sistemas,
+        prog_medicina,
+        prog_derecho,
+        prog_matematicas,
+        prog_industrial,
+        prog_civil,
+    ):
         db.refresh(p)
 
     # 2. Definir los 12 aspirantes cubriendo todos los casos borde del procedimiento PAR.01
@@ -560,9 +746,163 @@ def poblar_escenario_semilla(
             )
 
     db.commit()
+
+    # 3. Cargar los 20 aspirantes y 40 soportes reales de seed_docs/simpledocs/
+    res_simpledocs = cargar_aspirantes_simpledocs(
+        db=db,
+        prog_op1_id=prog_industrial.id,
+        prog_op2_id=prog_civil.id,
+        directorio_simpledocs=directorio_soportes / "simpledocs"
+        if (directorio_soportes / "simpledocs").exists()
+        else SIMPLEDOCS_DIR,
+        orden_inicial=len(definiciones_aspirantes) + 1,
+    )
+
     return {
-        "programas_creados": 4,
-        "aspirantes_creados": len(definiciones_aspirantes),
-        "archivos_soportes_generados": len(archivos_creados),
+        "programas_creados": 6,
+        "aspirantes_creados": len(definiciones_aspirantes) + res_simpledocs["aspirantes_simpledocs_creados"],
+        "aspirantes_base": len(definiciones_aspirantes),
+        "aspirantes_simpledocs": res_simpledocs["aspirantes_simpledocs_creados"],
+        "archivos_soportes_generados": len(archivos_creados) + res_simpledocs["soportes_simpledocs_registrados"],
         "directorio_soportes": str(directorio_soportes),
+    }
+
+
+def cargar_aspirantes_simpledocs(
+    db: Session,
+    prog_op1_id: int,
+    prog_op2_id: Optional[int] = None,
+    directorio_simpledocs: Path = SIMPLEDOCS_DIR,
+    orden_inicial: int = 13,
+) -> Dict[str, Any]:
+    """Carga los 20 aspirantes de DatosAspirantes.xlsx y vincula sus 20 PDFs ICFES y 20 JPGs de Diploma."""
+    ruta_xlsx = directorio_simpledocs / "DatosAspirantes.xlsx"
+    registros_xlsx = leer_datos_aspirantes_xlsx(ruta_xlsx)
+    if not registros_xlsx:
+        return {"aspirantes_simpledocs_creados": 0, "soportes_simpledocs_registrados": 0}
+
+    grupos_sisben_ciclo = ["A2", "B1", "B4", "C3", "C7", "A3", "B2", "C1", "B5", "OTROS"]
+    aspirantes_creados = 0
+    soportes_registrados = 0
+
+    for reg in registros_xlsx:
+        idx = reg["indice_simpledocs"]
+        orden = orden_inicial + idx - 1
+        sisben = grupos_sisben_ciclo[(idx - 1) % len(grupos_sisben_ciclo)]
+        num_opciones = 2 if prog_op2_id is not None else 1
+        liq = liquidar_derechos_inscripcion(sisben, num_opciones=num_opciones)
+
+        # Buscar archivos de soporte en seed_docs/simpledocs/
+        archivos_pdf = sorted(directorio_simpledocs.glob(f"{idx} AC*.pdf"))
+        ruta_pdf = archivos_pdf[0] if archivos_pdf else None
+        ruta_jpg = directorio_simpledocs / f"{idx} Diploma.jpg"
+
+        # Verificar si el PDF adjunto corresponde al SNP declarado por el aspirante
+        snp_en_nombre_pdf = ""
+        if ruta_pdf is not None:
+            m_snp = re.search(r"\b(AC\d{10,14})\b", ruta_pdf.name)
+            if m_snp:
+                snp_en_nombre_pdf = m_snp.group(1)
+
+        # Poblar MockIcfesOficial cuando el certificado PDF oficial coincide con el SNP del aspirante (#02..#20)
+        if snp_en_nombre_pdf and snp_en_nombre_pdf == reg["registro_snp"]:
+            ya_existe_snp = (
+                db.query(MockIcfesOficial)
+                .filter(MockIcfesOficial.registro_snp == reg["registro_snp"])
+                .first()
+            )
+            if not ya_existe_snp:
+                db.add(
+                    MockIcfesOficial(
+                        registro_snp=reg["registro_snp"],
+                        documento_identidad=reg["documento_identidad"],
+                        nombres_completos=reg["nombre_completo"],
+                        anio_examen=reg["anio_examen"],
+                        fecha_presentacion=f"{reg['anio_examen']}-07-26",
+                        puntaje_global=reg["puntaje_global"],
+                        ciencias_naturales=reg["ciencias_naturales"],
+                        sociales_ciudadanas=reg["sociales_ciudadanas"],
+                        matematicas=reg["matematicas"],
+                        lectura_critica=reg["lectura_critica"],
+                        ingles=reg["ingles"],
+                    )
+                )
+
+        # Construir correo institucional de contacto
+        slug_correo = re.sub(
+            r"[^a-z0-9]+",
+            ".",
+            reg["nombre_completo"]
+            .lower()
+            .translate(str.maketrans("áéíóúñü", "aeiounu")),
+        ).strip(".")
+        correo = f"{slug_correo}.{idx}@aspirante.uis.edu.co"
+
+        asp = Aspirante(
+            orden_inscripcion=orden,
+            tipo_documento=reg["tipo_documento"],
+            documento_identidad=reg["documento_identidad"],
+            nombres=reg["nombres"],
+            apellidos=reg["apellidos"],
+            correo=correo,
+            edad=reg["edad"],
+            grupo_sisben=sisben,
+            programa_opcion_1_id=prog_op1_id,
+            programa_opcion_2_id=prog_op2_id,
+            tarifa_inscripcion_smlmv=liq["total_smlmv"],
+            registro_snp=reg["registro_snp"],
+            anio_examen=reg["anio_examen"],
+            puntaje_global_declarado=reg["puntaje_global"],
+            ciencias_naturales_declarado=reg["ciencias_naturales"],
+            sociales_ciudadanas_declarado=reg["sociales_ciudadanas"],
+            matematicas_declarado=reg["matematicas"],
+            lectura_critica_declarado=reg["lectura_critica"],
+            ingles_declarado=reg["ingles"],
+            nivel_educativo_valido=True,
+            certificado_electoral_valido=False,
+            estado_proceso="INSCRITO",
+            causal_decision=(
+                f"Inscrito desde lote documental simpledocs ({reg['ciudad_residencia']}). "
+                "Pendiente de verificación ICFES (Paso 4)."
+            ),
+        )
+        asp.append_log(
+            "PASO_2_INSCRIPCION",
+            f"Inscripción registrada desde DatosAspirantes.xlsx (Turno #{orden}, Lote simpledocs #{idx}). "
+            f"Ciudad: {reg['ciudad_residencia']}. Tarifa SISBÉN ({liq['categoria_sisben']}): {liq['total_smlmv']} SMLMV.",
+        )
+        db.add(asp)
+        db.flush()
+        aspirantes_creados += 1
+
+        if ruta_pdf is not None and ruta_pdf.exists():
+            db.add(
+                SoporteDocumental(
+                    aspirante_id=asp.id,
+                    tipo_documento="ICFES",
+                    nombre_archivo=ruta_pdf.name,
+                    ruta_archivo=f"seed_docs/simpledocs/{ruta_pdf.name}",
+                    mime_type="application/pdf",
+                    es_valido=True,
+                )
+            )
+            soportes_registrados += 1
+
+        if ruta_jpg.exists():
+            db.add(
+                SoporteDocumental(
+                    aspirante_id=asp.id,
+                    tipo_documento="DIPLOMA_BACHILLER",
+                    nombre_archivo=ruta_jpg.name,
+                    ruta_archivo=f"seed_docs/simpledocs/{ruta_jpg.name}",
+                    mime_type="image/jpeg",
+                    es_valido=True,
+                )
+            )
+            soportes_registrados += 1
+
+    db.commit()
+    return {
+        "aspirantes_simpledocs_creados": aspirantes_creados,
+        "soportes_simpledocs_registrados": soportes_registrados,
     }

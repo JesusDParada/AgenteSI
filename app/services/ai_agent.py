@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
@@ -29,6 +30,7 @@ from app.services.rules_engine import (
     generar_listados_oficiales,
     liquidar_derechos_inscripcion,
 )
+from app.services.seed_data import extraer_datos_pdf_icfes_real
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 ENV_FILE_PATH = PROJECT_ROOT / ".env"
@@ -423,9 +425,50 @@ def _extraer_con_fallback_local(
     tipo = soporte.tipo_documento.upper()
     nombre_completo = f"{aspirante.nombres} {aspirante.apellidos}"
     nombre_lower = (soporte.nombre_archivo or "").lower()
+    ruta_str = soporte.ruta_archivo or ""
     es_archivo_invalido = "invalido" in nombre_lower or "adulterado" in nombre_lower
 
     if tipo == "ICFES":
+        # 1. Si es un PDF real de simpledocs (o cualquier PDF oficial Saber 11° con texto extraíble), leer su contenido real
+        if "simpledocs" in ruta_str:
+            datos_pdf = extraer_datos_pdf_icfes_real(Path(ruta_str))
+            if datos_pdf:
+                coincide_snp = datos_pdf["registro_snp"].strip().upper() == aspirante.registro_snp.strip().upper()
+                coincide_doc = datos_pdf["documento_identidad"].strip() == aspirante.documento_identidad.strip()
+                es_val = coincide_snp and coincide_doc and not es_archivo_invalido
+                if es_val:
+                    obs = (
+                        f"Soporte oficial Saber 11° ('{soporte.nombre_archivo}') leído y validado correctamente: "
+                        f"SNP {datos_pdf['registro_snp']}, Doc {datos_pdf['documento_identidad']}, "
+                        f"Global {datos_pdf['puntaje_global']:.0f}/500 "
+                        f"(LC={datos_pdf['lectura_critica']:.0f}, MAT={datos_pdf['matematicas']:.0f}, "
+                        f"SC={datos_pdf['sociales_ciudadanas']:.0f}, CN={datos_pdf['ciencias_naturales']:.0f}, "
+                        f"ING={datos_pdf['ingles']:.0f})."
+                    )
+                else:
+                    obs = (
+                        f"ALERTA DE INCONSISTENCIA DOCUMENTAL: El soporte PDF ('{soporte.nombre_archivo}') "
+                        f"pertenece a {datos_pdf['nombres_completos']} (Doc: {datos_pdf['documento_identidad']}, "
+                        f"SNP: {datos_pdf['registro_snp']}, Global: {datos_pdf['puntaje_global']:.0f}/500), "
+                        f"lo cual NO coincide con el aspirante inscrito {nombre_completo} "
+                        f"(Doc: {aspirante.documento_identidad}, SNP declarado: {aspirante.registro_snp})."
+                    )
+                return ExtraccionIcfesSchema(
+                    registro_snp=datos_pdf["registro_snp"],
+                    documento_identidad=datos_pdf["documento_identidad"],
+                    nombres_completos=datos_pdf["nombres_completos"],
+                    anio_examen=datos_pdf["anio_examen"],
+                    fecha_presentacion=datos_pdf["fecha_presentacion"],
+                    puntaje_global=datos_pdf["puntaje_global"],
+                    ciencias_naturales=datos_pdf["ciencias_naturales"],
+                    sociales_ciudadanas=datos_pdf["sociales_ciudadanas"],
+                    matematicas=datos_pdf["matematicas"],
+                    lectura_critica=datos_pdf["lectura_critica"],
+                    ingles=datos_pdf["ingles"],
+                    es_valido=es_val,
+                    observaciones=obs,
+                )
+
         oficial = (
             db.query(MockIcfesOficial)
             .filter(MockIcfesOficial.registro_snp == aspirante.registro_snp)
@@ -474,15 +517,23 @@ def _extraer_con_fallback_local(
         es_cert_11 = "11" in nombre_lower or "undecimo" in nombre_lower or "certificado" in nombre_lower
         tipo_edu = "CERTIFICADO_GRADO_11" if es_cert_11 else "DIPLOMA_BACHILLER"
         valido = not es_archivo_invalido
+        institucion = "Instituto Técnico Superior Dámaso Zapata - Bucaramanga"
+        if "simpledocs" in ruta_str:
+            m_num = re.match(r"^(\d+)\s+diploma", nombre_lower)
+            num_dip = int(m_num.group(1)) if m_num else 1
+            if num_dip <= 10:
+                institucion = "Colegio Panamericano (Resolución MEN N° 6665 - Bachiller Académico)"
+            else:
+                institucion = "Institución Educativa Carlos Arturo Duque Ramírez - Puerto Nare, Antioquia"
         return ExtraccionDiplomaSchema(
             documento_identidad=aspirante.documento_identidad,
             nombres_completos=nombre_completo,
-            institucion_educativa="Instituto Técnico Superior Dámaso Zapata - Bucaramanga",
+            institucion_educativa=institucion,
             tipo_soporte_educativo=tipo_edu,
             anio_grado_o_curso=aspirante.anio_examen,
             es_valido=valido,
             observaciones=(
-                f"Soporte académico válido ({tipo_edu}): acredita requisito de nivel educativo PAR.01."
+                f"Soporte académico válido ({tipo_edu} - {institucion}): acredita requisito de nivel educativo PAR.01."
                 if valido
                 else "Soporte académico inválido o ilegible: no acredita grado 11° ni título de bachiller."
             ),
@@ -541,6 +592,21 @@ def auditar_soporte_multimodal(
         )
         if resultado_schema is not None:
             uso_llm = True
+            # Verificar coherencia entre los datos extraídos por Gemini Vision y el aspirante inscrito
+            if soporte.tipo_documento.upper() == "ICFES":
+                snp_ext = (getattr(resultado_schema, "registro_snp", "") or "").strip().upper()
+                doc_ext = re.sub(r"\D", "", getattr(resultado_schema, "documento_identidad", "") or "")
+                if (snp_ext and snp_ext != aspirante.registro_snp.strip().upper()) or (
+                    doc_ext and doc_ext != aspirante.documento_identidad.strip()
+                ):
+                    resultado_schema.es_valido = False
+                    resultado_schema.observaciones = (
+                        f"ALERTA DE INCONSISTENCIA DOCUMENTAL (Detectada por {modo_ia}): "
+                        f"El PDF '{soporte.nombre_archivo}' registra a {resultado_schema.nombres_completos} "
+                        f"(Doc: {doc_ext or resultado_schema.documento_identidad}, SNP: {snp_ext}), "
+                        f"que NO coincide con el aspirante inscrito {aspirante.nombres} {aspirante.apellidos} "
+                        f"(Doc: {aspirante.documento_identidad}, SNP declarado: {aspirante.registro_snp})."
+                    )
 
     if resultado_schema is None:
         resultado_schema = _extraer_con_fallback_local(db, soporte, aspirante)
@@ -775,6 +841,11 @@ def verificar_aspirante_icfes_paso4(
                 discrepancias.append(
                     f"Discrepancia en {nombre_campo}: valor registrado en inscripción ({val_decl:.1f}) != valor oficial ICFES ({val_ofic:.1f})."
                 )
+
+    # Verificar si alguno de los soportes documentales ICFES adjuntos presenta inconsistencia de identidad o SNP
+    for sop in aspirante.soportes:
+        if sop.tipo_documento.upper() == "ICFES" and sop.es_valido is False and sop.observaciones_ia:
+            discrepancias.append(f"Soporte documental adjunto ('{sop.nombre_archivo}'): {sop.observaciones_ia}")
 
     if discrepancias:
         aspirante.estado_proceso = "INCONSISTENCIA_ICFES"
@@ -1256,7 +1327,7 @@ def obtener_estado_pipeline_par01(db: Session) -> Dict[str, Any]:
                     f"Motor: {modelo_etapa1 if uso_llm_etapa1 else 'Extractor Local Determinista'}",
                 ]
                 if etapa1_completada
-                else ["Haz clic para extraer datos de los 29 PDFs/PNGs"]
+                else [f"Haz clic para extraer datos de los {total_sop} soportes (PDF/PNG/JPG)"]
             ),
         },
         {
@@ -1289,8 +1360,8 @@ def obtener_estado_pipeline_par01(db: Session) -> Dict[str, Any]:
             ),
             "resultado_items": (
                 [
-                    f"✓ {verificados_p4}/12 coinciden con ICFES oficial",
-                    f"⚠ {inconsistencias_p4} discrepancia detectada (envío correo DARA)",
+                    f"✓ {verificados_p4}/{len(aspirantes)} coinciden con ICFES oficial",
+                    f"⚠ {inconsistencias_p4} discrepancia(s) detectada(s) (envío correo DARA)",
                 ]
                 if tiene_p4
                 else ["Cruza puntajes declarados vs base nacional ICFES"]

@@ -1,0 +1,160 @@
+flowchart TD
+    %% =====================================================================
+    %% ESTILOS INSTITUCIONALES UIS / ARQUITECTURA HÍBRIDA
+    %% =====================================================================
+    classDef inputNode fill:#f1f5f9,stroke:#475569,stroke-width:2px,color:#0f172a
+    classDef llmNode fill:#eef2ff,stroke:#4f46e5,stroke-width:2px,color:#1e1b4b
+    classDef detNode fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#064e3b
+    classDef hybridNode fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+    classDef rejectNode fill:#fff1f2,stroke:#e11d48,stroke-width:2px,color:#881337
+    classDef successNode fill:#dcfce7,stroke:#15803d,stroke-width:3px,color:#14532d
+    classDef dbNode fill:#fefce8,stroke:#ca8a04,stroke-width:2px,color:#713f12
+
+    %% =====================================================================
+    %% FASE 0: FUENTES DE DATOS, OFERTA E INSCRIPCIÓN (PASOS 1 A 3 PAR.01)
+    %% =====================================================================
+    subgraph FASE_0 ["FASE 0 · Oferta Académica, Inscripción y Liquidación SISBÉN (Pasos 1 a 3 PAR.01)"]
+        direction TB
+        P1["Paso 1: Oferta de Programas y Cupos por Facultad<br/>(ING-SIS, MED, DER, MAT, ING-IND, ING-CIV)<br/>Pesos ponderados que suman 100% por programa"]:::detNode
+        F_SEED["Fuentes de Inscripción y Soportes:<br/>1) Escenario base (12 casos borde PAR.01)<br/>2) Lote simpledocs (DatosAspirantes.xlsx + 20 PDFs + 20 JPGs)<br/>3) Inscripción manual / Carga web (uploads/)"]:::inputNode
+        P2["Paso 2: Registro de Inscripción del Aspirante<br/>- Validación de máximo 2 opciones de programa<br/>- Asignación de turno (orden_inscripcion)<br/>- Registro de SNP y 6 puntajes declarados"]:::detNode
+        S6["Sección 6: Liquidación Determinista de Derechos (SISBÉN)<br/>- Grupo A: 0.05 SMLMV (1ra) + 0.025 SMLMV (2da)<br/>- Grupo B: 0.07 SMLMV (1ra) + 0.035 SMLMV (2da)<br/>- C1-C9: 0.15 (1ra) + 0.075 (2da) | C10-C18/Otros: 0.30 + 0.15"]:::detNode
+        P3["Paso 3: Vinculación de Soportes Documentales<br/>- Reporte ICFES Saber 11° (PDF)<br/>- Diploma / Acta de Grado / Cert. 11° (PNG / JPG)<br/>- Certificado Electoral últimas elecciones (PNG)"]:::inputNode
+
+        P1 --> P2
+        F_SEED --> P2
+        P2 --> S6 --> P3
+    end
+
+    DB[("Base de Datos SQLite (dara_admisiones.db)<br/>5 Tablas: ProgramaAcademico, Aspirante, SoporteDocumental,<br/>MockIcfesOficial, MockHistoricoUis + Bitácora JSON")]:::dbNode
+    P3 --> DB
+
+    %% =====================================================================
+    %% ETAPA 1: AUDITORÍA DOCUMENTAL MULTIMODAL IA (VISIÓN + FALLBACK)
+    %% =====================================================================
+    subgraph ETAPA_1 ["ETAPA 1 · Auditoría Documental Multimodal IA (ai_agent.py)"]
+        direction TB
+        E1_IN["Lectura de bytes del soporte documental<br/>(application/pdf, image/png, image/jpeg)"]:::inputNode
+        E1_KEY{"¿GEMINI_API_KEY activa<br/>y llamada multimodal?"}:::hybridNode
+        E1_LLM["Gemini Vision Multimodal<br/>(gemini-3.5-flash-lite -> 2.5-flash-lite -> 2.5-flash -> 2.0-flash)<br/>Structured Outputs con response_schema Pydantic"]:::llmNode
+        E1_FB["Extractor Determinista Local de Respaldo<br/>- PDFs reales (simpledocs): pdftotext + Regex SNP/Doc/Puntajes<br/>- Diplomas JPG/PNG y Certificado Electoral"]:::detNode
+        E1_SCH["Validación Estricta de Esquemas Pydantic:<br/>1) ExtraccionIcfesSchema (SNP, Doc, Global, 5 áreas)<br/>2) ExtraccionDiplomaSchema (Institución, Tipo, Año)<br/>3) ExtraccionElectoralSchema (Fecha elecciones, Vigencia)"]:::hybridNode
+        E1_CHK{"¿Coincide SNP y Documento<br/>del PDF con el Aspirante?"}:::detNode
+        E1_OK["Soporte Válido (es_valido = True)<br/>Actualiza banderas en Aspirante:<br/>- nivel_educativo_valido<br/>- certificado_electoral_valido (si edad >= 18)"]:::detNode
+        E1_ALERT["Alerta de Inconsistencia Documental (es_valido = False)<br/>Ej: Juanita Romero (#01 simpledocs) adjuntó PDF<br/>de Mariana Tovar Quintero (SNP AC202637178411)"]:::rejectNode
+
+        E1_IN --> E1_KEY
+        E1_KEY -- "Sí (Modo LLM En Vivo)" --> E1_LLM --> E1_SCH
+        E1_KEY -- "No / Respaldo Local" --> E1_FB --> E1_SCH
+        E1_SCH --> E1_CHK
+        E1_CHK -- "Coincide" --> E1_OK
+        E1_CHK -- "No coincide / Adulterado" --> E1_ALERT
+    end
+
+    DB --> E1_IN
+    E1_OK --> P4_START
+    E1_ALERT --> P4_START
+
+    %% =====================================================================
+    %% PASO 4: CRUCE MASIVO CON EL ICFES Y NOTIFICACIÓN DE INCONSISTENCIA
+    %% =====================================================================
+    subgraph PASO_4 ["PASO 4 · Carga y Verificación de Información con el ICFES (Híbrido: Reglas + LLM)"]
+        direction TB
+        P4_START["Consulta en Fuente Oficial Nacional (MockIcfesOficial)<br/>por registro_snp del aspirante"]:::detNode
+        P4_CMP["Comparación Aritmética Determinista:<br/>1) Existencia del SNP en base nacional ICFES<br/>2) Coincidencia exacta de documento_identidad y anio_examen<br/>3) Diferencia <= 0.01 en Puntaje Global y las 5 áreas<br/>4) Verificación de validez del soporte PDF ICFES adjunto"]:::detNode
+        P4_DEC{"¿Existe alguna discrepancia<br/>o soporte inválido?"}:::detNode
+        P4_FAIL["Estado: INCONSISTENCIA_ICFES<br/>Redacción de Notificación Oficial (Plantilla + Dictamen LLM)<br/>Solicita enviar PDF oficial a admisiones@uis.edu.co"]:::rejectNode
+        P4_PASS["Estado: VERIFICADO_ICFES<br/>Se copian los 6 puntajes oficiales verificados<br/>a la ficha del aspirante"]:::detNode
+
+        P4_START --> P4_CMP --> P4_DEC
+        P4_DEC -- "Sí (Ej: Andrés #8 o Juanita #13)" --> P4_FAIL
+        P4_DEC -- "No (Coincidencia 100%)" --> P4_PASS
+    end
+
+    %% =====================================================================
+    %% PASO 5: VALIDACIÓN DE PUNTAJES MÍNIMOS Y VIGENCIA (100% DETERMINISTA)
+    %% =====================================================================
+    subgraph PASO_5 ["PASO 5 · Validación de Requisitos Mínimos Reglamentarios (100% Determinista - rules_engine.py)"]
+        direction TB
+        P5_EDU{"¿nivel_educativo_valido<br/>(Diploma / Grado 11°)?"}:::detNode
+        P5_REJ_EDU["Estado: ANULADO_NIVEL_EDUCATIVO"]:::rejectNode
+        P5_VIG{"¿Vigencia del Examen Saber 11°?<br/>anio_examen >= 2012 y<br/>(anio_convocatoria - anio_examen) <= 5"}:::detNode
+        P5_REJ_VIG["Estado: ANULADO_VIGENCIA_EXAMEN<br/>(Ej: Jorge Mantilla #7 - Examen 2018)"]:::rejectNode
+        P5_MIN{"¿Puntaje >= 31.0 puntos en CADA UNA<br/>de las 5 pruebas del ICFES?<br/>(CN, SC, MAT, LC, ING >= 31)"}:::detNode
+        P5_REJ_MIN["Estado: ANULADO_PUNTAJE_MINIMO<br/>(Ej: Daniela Quintero #6 - Inglés 28.0)"]:::rejectNode
+        P5_HAB["Estado: HABILITADO<br/>Pasa a clasificación por mérito académico"]:::detNode
+
+        P5_EDU -- "No" --> P5_REJ_EDU
+        P5_EDU -- "Sí" --> P5_VIG
+        P5_VIG -- "No (> 5 años)" --> P5_REJ_VIG
+        P5_VIG -- "Sí (<= 5 años)" --> P5_MIN
+        P5_MIN -- "No (< 31 pts)" --> P5_REJ_MIN
+        P5_MIN -- "Sí (>= 31 en las 5)" --> P5_HAB
+    end
+
+    P4_PASS --> P5_EDU
+
+    %% =====================================================================
+    %% PASOS 6 Y 7: PONDERACIÓN, 5 DESEMPATES, ARCHIVO HISTÓRICO Y 1RA/2DA OPCIÓN
+    %% =====================================================================
+    subgraph PASOS_6_7 ["PASOS 6 Y 7 · Selección por Mérito, 5 Desempates en Cascada y Cruce Histórico P.F.U. (100% Determinista)"]
+        direction TB
+        P6_POND["Cálculo de Puntaje Ponderado Exacto (4 decimales)<br/>Ponderado = (CN*w_cn + SC*w_sc + MAT*w_mat + LC*w_lc + ING*w_ing) / 100<br/>Se calcula para 1ra Opción y 2da Opción"]:::detNode
+        P6_SORT["Ordenamiento de Mérito y 5 Reglas de Desempate en Cascada:<br/>1° Mayor Puntaje Global Saber 11° (0-500)<br/>2° Mayor Puntaje en Lectura Crítica<br/>3° Mayor Puntaje en Sociales y Ciudadanas<br/>4° Certificado Electoral válido (si edad >= 18, Ej: Valentina #3)<br/>5° Menor turno de inscripción (orden_inscripcion)"]:::detNode
+        P6_OP1["Fase A: Asignación de Cupos en PRIMERA OPCIÓN<br/>Recorre ranking por programa hasta completar cupos_ofertados"]:::detNode
+        P7_HIST{"Paso 7: Cruce contra Archivo Histórico UIS<br/>(MockHistoricoUis)<br/>¿Registra P.F.U. o Sanción Vigente?"}:::detNode
+        P7_PFU["Estado: INHABILITADO_HISTORICO_UIS<br/>Se libera el cupo y se aplica CORRIMIENTO AUTOMÁTICO<br/>al siguiente aspirante en mérito (Ej: Sebastián #2 -> entra Santiago #4)"]:::rejectNode
+        P6_ADM1["Estado: ADMITIDO (Opción 1)<br/>Se descuenta 1 cupo del programa"]:::successNode
+        P6_OP2["Fase B: Asignación de Cupos Remanentes en SEGUNDA OPCIÓN<br/>Para aspirantes HABILITADOS no admitidos en 1ra opción<br/>(Ej: Nicolás Pardo #5 admitido en Matemáticas)"]:::detNode
+        P6_DEC2{"¿Alcanza cupo remanente en 2da opción<br/>y aprueba cruce Histórico UIS?"}:::detNode
+        P6_ADM2["Estado: ADMITIDO (Opción 2)"]:::successNode
+        P6_NOADM["Estado: NO_ADMITIDO<br/>Causal: Agotamiento de cupos ofertados en sus opciones"]:::rejectNode
+
+        P6_POND --> P6_SORT --> P6_OP1 --> P7_HIST
+        P7_HIST -- "Sí tiene P.F.U./Sanción" --> P7_PFU
+        P7_PFU -. "Corrimiento de cupo" .-> P6_OP1
+        P7_HIST -- "Sin inhabilidad (Alcanza cupo Op.1)" --> P6_ADM1
+        P7_HIST -- "No alcanza cupo en Op.1" --> P6_OP2
+        P6_OP2 --> P6_DEC2
+        P6_DEC2 -- "Sí" --> P6_ADM2
+        P6_DEC2 -- "No" --> P6_NOADM
+    end
+
+    P5_HAB --> P6_POND
+
+    %% =====================================================================
+    %% PASOS 8 A 13: ACTA COMITÉ, CONSEJO ACADÉMICO, CÓDIGOS UIS Y CARTAS
+    %% =====================================================================
+    subgraph PASOS_8_13 ["PASOS 8 AL 13 · Comité de Admisiones, Acta Consejo Académico, Códigos UIS y Matrícula (Híbrido)"]
+        direction TB
+        P8_9["Pasos 8 y 9: Consolidación de Listados Oficiales e Informe Técnico<br/>- Listado de Admitidos, No Admitidos e Inscripciones Anuladas<br/>- Proyecto de Acta del Consejo Académico + Dictamen Ejecutivo LLM"]:::hybridNode
+        P10_11["Pasos 10 y 11: Aprobación en Consejo Académico<br/>y Publicación Oficial de Resultados en Portal Web UIS"]:::detNode
+        P12_COD["Paso 12A (Determinista): Apertura de Hoja de Vida Académica<br/>y Asignación de Código Único de Estudiante UIS (Formato 2262XXX)"]:::detNode
+        P12_CARTA["Paso 12B (Híbrido): Expedición de Carta Oficial de Admisión<br/>Plantilla Reglamentaria DARA + Mensaje Institucional Solemne LLM"]:::hybridNode
+        P13["Paso 13: Entrega de Documentación y Liquidación de Matrícula<br/>Fin del Procedimiento PAR.01"]:::successNode
+
+        P8_9 --> P10_11 --> P12_COD --> P12_CARTA --> P13
+    end
+
+    P6_ADM1 --> P8_9
+    P6_ADM2 --> P8_9
+    P6_NOADM --> P8_9
+    P4_FAIL --> P8_9
+    P5_REJ_EDU --> P8_9
+    P5_REJ_VIG --> P8_9
+    P5_REJ_MIN --> P8_9
+    P7_PFU --> P8_9
+
+    %% =====================================================================
+    %% COPILOTO CONVERSACIONAL DARA (TOOL CALLING) Y TELEMETRÍA
+    %% =====================================================================
+    subgraph COPILOTO ["MÓDULO TRANSVERSAL · Copiloto Conversacional DARA con Tool Calling y Telemetría en Vivo"]
+        direction TB
+        COP_UI["Consulta del Coordinador de Admisiones en Lenguaje Natural<br/>(POST /api/copilot/chat)"]:::inputNode
+        COP_TOOLS["6 Herramientas Conectadas a SQLite:<br/>1) consultar_aspirante<br/>2) obtener_resumen_proceso<br/>3) ejecutar_auditoria_documental<br/>4) ejecutar_seleccion_completa_par01<br/>5) generar_acta_comite_admisiones<br/>6) calcular_tarifa_inscripcion_sisben"]:::hybridNode
+        COP_TEL["Bitácora de Auditoría por Aspirante (log_auditoria)<br/>y Telemetría en Vivo (LLM vs Determinista, Latencia ms)"]:::llmNode
+
+        COP_UI --> COP_TOOLS --> COP_TEL
+    end
+
+    DB <--> COP_TOOLS
