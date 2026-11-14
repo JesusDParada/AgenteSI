@@ -1,0 +1,85 @@
+flowchart LR
+    %% =====================================================================
+    %% ESTILOS VISUALES INSTITUCIONALES UIS PARA EXPOSICIÓN (SLIDES 16:9)
+    %% =====================================================================
+    classDef inputNode fill:#f8fafc,stroke:#475569,stroke-width:2px,color:#0f172a,font-size:12px
+    classDef aiNode fill:#eef2ff,stroke:#4f46e5,stroke-width:2.5px,color:#1e1b4b,font-weight:bold,font-size:12px
+    classDef rulesNode fill:#ecfdf5,stroke:#059669,stroke-width:2px,color:#064e3b,font-size:12px
+    classDef hybridNode fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e3a8a,font-size:12px
+    classDef alertNode fill:#fff1f2,stroke:#e11d48,stroke-width:2px,color:#881337,font-size:11px
+    classDef successNode fill:#dcfce7,stroke:#16a34a,stroke-width:2.5px,color:#14532d,font-weight:bold,font-size:12px
+    classDef copilotNode fill:#fefce8,stroke:#d97706,stroke-width:2px,color:#78350f,font-size:12px
+
+    %% =====================================================================
+    %% FASE 1: INGESTA Y REGISTRO
+    %% =====================================================================
+    subgraph F1 ["1. INGESTA Y REGISTRO"]
+        direction TB
+        I_ASP["<b>Registro del Aspirante</b><br/>• Opciones de carrera (1ra y 2da)<br/>• Liquidación SISBÉN (SMLMV)"]:::inputNode
+        I_DOCS["<b>Carga de Soportes</b><br/>• Reporte Saber 11° (PDF)<br/>• Diploma de Bachiller (JPG/PNG)<br/>• Certificado Electoral (PNG)"]:::inputNode
+        I_ASP --> I_DOCS
+    end
+
+    %% =====================================================================
+    %% FASE 2: AUDITORÍA MULTIMODAL IA
+    %% =====================================================================
+    subgraph F2 ["2. AUDITORÍA DOCUMENTAL IA"]
+        direction TB
+        AI_EXT["<b>Gemini Vision Multimodal</b><br/>• Extracción con esquemas Pydantic<br/>• Validación cruzada de identidad<br/>(Cédula y SNP vs Aspirante)"]:::aiNode
+        AI_ALERT["⚠️ <b>Alerta Inconsistencia</b><br/>Documento ajeno o adulterado"]:::alertNode
+        AI_EXT -.->|Discrepancia| AI_ALERT
+    end
+
+    %% =====================================================================
+    %% FASE 3: VERIFICACIÓN OFICIAL Y REQUISITOS
+    %% =====================================================================
+    subgraph F3 ["3. VERIFICACIÓN Y REQUISITOS"]
+        direction TB
+        V_ICFES["<b>Cruce Oficial ICFES</b><br/>• Confrontación determinista<br/>• Redacción de requerimiento IA"]:::hybridNode
+        V_RULES["<b>Filtros Mínimos PAR.01</b><br/>• Examen vigente (≤ 5 años)<br/>• Puntaje ≥ 31 pts en 5 áreas"]:::rulesNode
+        V_FAIL["❌ <b>Inscripción Anulada</b><br/>No supera requisitos mínimos"]:::alertNode
+        V_ICFES --> V_RULES
+        V_RULES -.->|Incumple| V_FAIL
+    end
+
+    %% =====================================================================
+    %% FASE 4: SELECCIÓN POR MÉRITO
+    %% =====================================================================
+    subgraph F4 ["4. SELECCIÓN POR MÉRITO"]
+        direction TB
+        M_CALC["<b>Ponderación y Ranking</b><br/>• Pesos de carrera (Opción 1 y 2)<br/>• 5 Desempates en cascada"]:::rulesNode
+        M_HIST["<b>Filtro Histórico UIS</b><br/>• Cruce de antecedentes y sanciones"]:::rulesNode
+        M_CORR["🔄 <b>Corrimiento de Cupo</b><br/>Inhabilita P.F.U. y promueve"]:::alertNode
+        M_CALC --> M_HIST
+        M_HIST -.->|Sanción P.F.U.| M_CORR
+    end
+
+    %% =====================================================================
+    %% FASE 5: FORMALIZACIÓN Y ADMISIÓN
+    %% =====================================================================
+    subgraph F5 ["5. FORMALIZACIÓN Y CIERRE"]
+        direction TB
+        O_UIS["<b>Adjudicación DARA</b><br/>• Código de Estudiante UIS<br/>• Hoja de Vida Académica"]:::rulesNode
+        O_LLM["<b>Generación Documental IA</b><br/>• Cartas oficiales con IA<br/>• Proyecto de Acta y Dictamen"]:::aiNode
+        O_FIN(["<b>RESULTADOS OFICIALES</b><br/>• Admitidos 1ra / 2da opción<br/>• Citación a Matrícula"]):::successNode
+        O_UIS --> O_LLM --> O_FIN
+    end
+
+    %% =====================================================================
+    %% FLUJO PRINCIPAL SECUENCIAL ENTRE FASES
+    %% =====================================================================
+    I_DOCS ==>|Expedientes| AI_EXT
+    AI_EXT ==>|Soportes Válidos| V_ICFES
+    V_RULES ==>|Habilitados| M_CALC
+    M_HIST ==>|Cupos Asignados| O_UIS
+
+    %% =====================================================================
+    %% MÓDULO TRANSVERSAL: COPILOTO CONVERSACIONAL DARA
+    %% =====================================================================
+    subgraph COP ["MÓDULO TRANSVERSAL · COPILOTO CONVERSACIONAL DARA (TOOL CALLING)"]
+        direction LR
+        COP_BOX["<b>Copiloto Conversacional IA (Gemini + SQLite)</b><br/>Consultas en tiempo real de expedientes • Auditoría documental en vivo • Simulación de selección • Generación de actas"]:::copilotNode
+    end
+
+    COP -.->|Supervisa y audita| F2
+    COP -.->|Simula selección| F4
